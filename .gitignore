@@ -42,6 +42,7 @@ local.properties
 !**/.idea/fileTemplates/
 !**/.idea/misc.xml
 
+/vendor_tools
 /third_party
 /out
 cmake-build-*
@@ -69,4 +70,5 @@ win/Release/
 win/Win32Demo/Debug/
 win/Win32Demo/Release/
 QTCMAKE.cfg
-vendor_tools
+test/baseline/.cache
+/result

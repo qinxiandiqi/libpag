@@ -20,11 +20,11 @@
 
 #include <chrono>
 #include "base/utils/Log.h"
-#include "core/ImageInfo.h"
 #include "pag/pag.h"
 #include "platform/android/Global.h"
 #include "platform/android/JNIEnvironment.h"
 #include "platform/android/JStringUtil.h"
+#include "tgfx/core/ImageInfo.h"
 
 struct RectData {
   float x, y, width, height;
@@ -59,4 +59,4 @@ jobject ToPAGMarkerObject(JNIEnv* env, const pag::Marker* marker);
 
 jobject ToPAGVideoRangeObject(JNIEnv* env, const pag::PAGVideoRange& range);
 
-pag::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap);
+tgfx::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap);

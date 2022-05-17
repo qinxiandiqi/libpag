@@ -18,8 +18,8 @@
 
 #include "JNIEnvironment.h"
 #include <pthread.h>
-#include "platform/Print.h"
-#include "platform/android/SetJavaVM.h"
+#include "tgfx/platform/Print.h"
+#include "tgfx/platform/android/SetJavaVM.h"
 
 static JavaVM* globalJavaVM = nullptr;
 static pthread_key_t threadKey = 0;
@@ -34,7 +34,7 @@ static void JNI_Thread_Destroy(void* value) {
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
   globalJavaVM = vm;
-  pag::SetJavaVM(vm);
+  tgfx::SetJavaVM(vm);
   pthread_key_create(&threadKey, JNI_Thread_Destroy);
   return JNI_VERSION_1_4;
 }

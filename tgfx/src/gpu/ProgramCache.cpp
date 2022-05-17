@@ -18,7 +18,7 @@
 
 #include "ProgramCache.h"
 
-namespace pag {
+namespace tgfx {
 #define MAX_PROGRAM_COUNT 128
 
 ProgramCache::ProgramCache(Context* context) : context(context) {
@@ -56,7 +56,7 @@ void ProgramCache::removeOldestProgram(bool releaseGPU) {
   programLRU.pop_back();
   programMap.erase(program->uniqueKey);
   if (releaseGPU) {
-    program->onRelease(context);
+    program->onReleaseGPU();
   }
   delete program;
 }
@@ -66,4 +66,4 @@ void ProgramCache::releaseAll(bool releaseGPU) {
     removeOldestProgram(releaseGPU);
   }
 }
-}  // namespace pag
+}  // namespace tgfx

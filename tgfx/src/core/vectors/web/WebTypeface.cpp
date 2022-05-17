@@ -18,15 +18,15 @@
 
 #include "WebTypeface.h"
 #include <vector>
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "platform/web/NativeTextureBuffer.h"
-#include "rendering/FontManager.h"
 
 using namespace emscripten;
 
-namespace pag {
-std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& name, const std::string&) {
-  return WebTypeface::Make(name);
+namespace tgfx {
+std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& name,
+                                                 const std::string& style) {
+  return WebTypeface::Make(name, style);
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string&, int) {
@@ -41,17 +41,22 @@ std::shared_ptr<Typeface> Typeface::MakeDefault() {
   return WebTypeface::Make("Arial");
 }
 
-std::shared_ptr<WebTypeface> WebTypeface::Make(const std::string& name) {
+std::shared_ptr<WebTypeface> WebTypeface::Make(const std::string& name, const std::string& style) {
   auto scalerContextClass = val::module_property("ScalerContext");
   if (!scalerContextClass.as<bool>()) {
     return nullptr;
   }
-  auto webTypeface = std::shared_ptr<WebTypeface>(new WebTypeface(name));
+  auto webTypeface = std::shared_ptr<WebTypeface>(new WebTypeface(name, style));
   webTypeface->scalerContextClass = scalerContextClass;
   return webTypeface;
 }
 
-WebTypeface::WebTypeface(std::string name) : _uniqueID(UniqueID::Next()), name(std::move(name)) {
+WebTypeface::WebTypeface(std::string name, std::string style)
+    : _uniqueID(UniqueID::Next()), name(std::move(name)), style(std::move(style)) {
+  webFontFamily = this->name;
+  if (!this->style.empty()) {
+    webFontFamily += " " + this->style;
+  }
 }
 
 WebTypeface::~WebTypeface() {
@@ -74,7 +79,7 @@ GlyphID WebTypeface::getGlyphID(const std::string& text) const {
   if (!hasColor() && scalerContextClass.call<bool>("isEmoji", text)) {
     return 0;
   }
-  auto& glyphs = GlyphsMap()[name];
+  auto& glyphs = GlyphsMap()[webFontFamily];
   auto iter = std::find(glyphs.begin(), glyphs.end(), text);
   if (iter != glyphs.end()) {
     return iter - glyphs.begin() + 1;
@@ -87,10 +92,10 @@ GlyphID WebTypeface::getGlyphID(const std::string& text) const {
 }
 
 std::string WebTypeface::getText(GlyphID glyphID) const {
-  if (glyphID == 0 || GlyphsMap().find(name) == GlyphsMap().end()) {
+  if (glyphID == 0 || GlyphsMap().find(webFontFamily) == GlyphsMap().end()) {
     return "";
   }
-  const auto& glyphs = GlyphsMap()[name];
+  const auto& glyphs = GlyphsMap()[webFontFamily];
   if (glyphID > glyphs.size()) {
     return "";
   }
@@ -112,7 +117,7 @@ float WebTypeface::getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, b
   if (glyphID == 0) {
     return 0;
   }
-  auto scalerContext = scalerContextClass.new_(name, size, fauxBold, fauxItalic);
+  auto scalerContext = scalerContextClass.new_(name, style, size, fauxBold, fauxItalic);
   return scalerContext.call<float>("getTextAdvance", getText(glyphID));
 }
 
@@ -121,7 +126,7 @@ FontMetrics WebTypeface::getMetrics(float size) const {
   if (iter != fontMetricsMap->end()) {
     return iter->second;
   }
-  auto scalerContext = scalerContextClass.new_(name, size);
+  auto scalerContext = scalerContextClass.new_(name, style, size);
   auto metrics = scalerContext.call<FontMetrics>("generateFontMetrics");
   fontMetricsMap->insert(std::make_pair(size, metrics));
   return metrics;
@@ -136,7 +141,7 @@ Rect WebTypeface::getGlyphBounds(GlyphID glyphID, float size, bool fauxBold,
   if (glyphID == 0) {
     return Rect::MakeEmpty();
   }
-  auto scalerContext = scalerContextClass.new_(name, size, fauxBold, fauxItalic);
+  auto scalerContext = scalerContextClass.new_(name, style, size, fauxBold, fauxItalic);
   return scalerContext.call<Rect>("getTextBounds", getText(glyphID));
 }
 
@@ -146,7 +151,7 @@ std::shared_ptr<TextureBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float
   if (glyphID == 0) {
     return nullptr;
   }
-  auto scalerContext = scalerContextClass.new_(name, size, fauxBold, fauxItalic);
+  auto scalerContext = scalerContextClass.new_(name, style, size, fauxBold, fauxItalic);
   auto bounds = scalerContext.call<Rect>("getTextBounds", getText(glyphID));
   auto buffer = scalerContext.call<val>("generateImage", getText(glyphID), bounds);
   if (matrix) {
@@ -154,4 +159,4 @@ std::shared_ptr<TextureBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float
   }
   return NativeTextureBuffer::Make(buffer.call<int>("width"), buffer.call<int>("height"), buffer);
 }
-}  // namespace pag
+}  // namespace tgfx

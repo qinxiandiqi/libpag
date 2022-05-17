@@ -19,13 +19,13 @@
 #pragma once
 
 #include <cstdlib>
-#include "platform/Print.h"
+#include "tgfx/platform/Print.h"
 
 namespace pag {
-#define ABORT(msg)                                                             \
-  do {                                                                         \
-    pag::PrintError("%s:%d: fatal error: \"%s\"\n", __FILE__, __LINE__, #msg); \
-    ::abort();                                                                 \
+#define ABORT(msg)                                                              \
+  do {                                                                          \
+    tgfx::PrintError("%s:%d: fatal error: \"%s\"\n", __FILE__, __LINE__, #msg); \
+    ::abort();                                                                  \
   } while (false)
 
 #ifdef NO_LOG
@@ -36,8 +36,8 @@ namespace pag {
 
 #else
 
-#define LOGI(...) pag::PrintLog(__VA_ARGS__)
-#define LOGE(...) pag::PrintError(__VA_ARGS__)
+#define LOGI(...) tgfx::PrintLog(__VA_ARGS__)
+#define LOGE(...) tgfx::PrintError(__VA_ARGS__)
 #define ASSERT(assertion) \
   if (!(assertion)) {     \
     ABORT(#assertion);    \

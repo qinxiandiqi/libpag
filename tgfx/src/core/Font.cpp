@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Font.h"
+#include "tgfx/core/Font.h"
 
-namespace pag {
+namespace tgfx {
 Font::Font() : Font(nullptr) {
 }
 
@@ -48,4 +48,4 @@ void Font::setSize(float newSize) {
     size = newSize;
   }
 }
-}  // namespace pag
+}  // namespace tgfx

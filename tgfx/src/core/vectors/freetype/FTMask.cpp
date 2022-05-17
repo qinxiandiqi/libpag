@@ -18,10 +18,10 @@
 
 #include "FTMask.h"
 #include "FTPath.h"
-#include "core/Bitmap.h"
+#include "tgfx/core/Bitmap.h"
 #include FT_STROKER_H
 
-namespace pag {
+namespace tgfx {
 static const FTLibrary& GetLibrary() {
   static const auto& library = *new FTLibrary;
   return library;
@@ -88,4 +88,8 @@ void FTMask::fillPath(const Path& path) {
     FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
   }
 }
-}  // namespace pag
+
+void FTMask::clear() {
+  Bitmap(buffer).eraseAll();
+}
+}  // namespace tgfx

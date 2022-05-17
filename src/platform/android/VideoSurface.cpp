@@ -18,36 +18,34 @@
 
 #include "VideoSurface.h"
 #include "android/native_window_jni.h"
-#include "gpu/opengl/GLTexture.h"
+#include "base/utils/Log.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 static Global<jclass> VideoSurfaceClass;
 static jmethodID VideoSurface_Make;
-static jmethodID VideoSurface_getOutputSurface;
 static jmethodID VideoSurface_updateTexImage;
 static jmethodID VideoSurface_attachToGLContext;
 static jmethodID VideoSurface_videoWidth;
 static jmethodID VideoSurface_videoHeight;
-static jmethodID VideoSurface_onRelease;
+static jmethodID VideoSurface_release;
 
 void VideoSurface::InitJNI(JNIEnv* env, const std::string& className) {
   VideoSurfaceClass.reset(env, env->FindClass(className.c_str()));
   std::string createSig = std::string("(II)L") + className + ";";
   VideoSurface_Make = env->GetStaticMethodID(VideoSurfaceClass.get(), "Make", createSig.c_str());
-  VideoSurface_getOutputSurface =
-      env->GetMethodID(VideoSurfaceClass.get(), "getOutputSurface", "()Landroid/view/Surface;");
   VideoSurface_updateTexImage = env->GetMethodID(VideoSurfaceClass.get(), "updateTexImage", "()Z");
   VideoSurface_attachToGLContext =
       env->GetMethodID(VideoSurfaceClass.get(), "attachToGLContext", "(I)Z");
   VideoSurface_videoWidth = env->GetMethodID(VideoSurfaceClass.get(), "videoWidth", "()I");
   VideoSurface_videoHeight = env->GetMethodID(VideoSurfaceClass.get(), "videoHeight", "()I");
-  VideoSurface_onRelease = env->GetMethodID(VideoSurfaceClass.get(), "onRelease", "()V");
+  VideoSurface_release = env->GetMethodID(VideoSurfaceClass.get(), "release", "()V");
 }
 
-OESTexture::OESTexture(GLTextureInfo info, int width, int height, bool hasAlpha)
-    : GLTexture(width, height, ImageOrigin::TopLeft), hasAlpha(hasAlpha) {
-  sampler.glInfo = info;
-  sampler.config = PixelConfig::RGBA_8888;
+OESTexture::OESTexture(const tgfx::GLSampler& glSampler, int width, int height)
+    : GLTexture(width, height, tgfx::ImageOrigin::TopLeft) {
+  sampler = glSampler;
 }
 
 void OESTexture::setTextureSize(int width, int height) {
@@ -57,7 +55,7 @@ void OESTexture::setTextureSize(int width, int height) {
 }
 
 void OESTexture::computeTransform() {
-  if (textureWidth == 0 || textureHeight == 0 || hasAlpha) {
+  if (textureWidth == 0 || textureHeight == 0) {
     return;
   }
   // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1
@@ -80,22 +78,18 @@ void OESTexture::computeTransform() {
   }
 }
 
-Point OESTexture::getTextureCoord(float x, float y) const {
-  if (hasAlpha) {
-    // 如果有 alpha 通道，不需要缩小纹素
-    return {x / static_cast<float>(textureWidth), y / static_cast<float>(textureHeight)};
-  }
+tgfx::Point OESTexture::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(width()) * sx + tx, y / static_cast<float>(height()) * sy + ty};
 }
 
-void OESTexture::onRelease(pag::Context* context) {
-  if (sampler.glInfo.id > 0) {
-    auto gl = GLContext::Unwrap(context);
-    gl->deleteTextures(1, &sampler.glInfo.id);
+void OESTexture::onReleaseGPU() {
+  if (sampler.id > 0) {
+    auto gl = tgfx::GLFunctions::Get(context);
+    gl->deleteTextures(1, &sampler.id);
   }
 }
 
-std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height, bool hasAlpha) {
+std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height) {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return nullptr;
@@ -105,12 +99,11 @@ std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height, bool has
   if (surface.empty()) {
     return nullptr;
   }
-  return std::shared_ptr<VideoSurface>(
-      new VideoSurface(env, surface.get(), width, height, hasAlpha));
+  return std::shared_ptr<VideoSurface>(new VideoSurface(env, surface.get(), width, height));
 }
 
-VideoSurface::VideoSurface(JNIEnv* env, jobject surface, int width, int height, bool hasAlpha)
-    : width(width), height(height), hasAlpha(hasAlpha) {
+VideoSurface::VideoSurface(JNIEnv* env, jobject surface, int width, int height)
+    : width(width), height(height) {
   videoSurface.reset(env, surface);
 }
 
@@ -119,75 +112,81 @@ VideoSurface::~VideoSurface() {
   if (env == nullptr) {
     return;
   }
-  env->CallVoidMethod(videoSurface.get(), VideoSurface_onRelease);
+  env->CallVoidMethod(videoSurface.get(), VideoSurface_release);
 }
 
-jobject VideoSurface::getOutputSurface(JNIEnv* env) const {
-  return env->CallObjectMethod(videoSurface.get(), VideoSurface_getOutputSurface);
+jobject VideoSurface::getVideoSurface() const {
+  return videoSurface.get();
 }
 
-bool VideoSurface::attachToContext(Context* context) {
-  if (oesTexture) {
+void VideoSurface::markPendingTexImage() {
+  hasPendingTextureImage = true;
+}
+
+void VideoSurface::clearPendingTexImage() {
+  auto env = JNIEnvironment::Current();
+  if (env == nullptr) {
+    return;
+  }
+  updateTexImage(env);
+}
+
+std::shared_ptr<tgfx::Texture> VideoSurface::makeTexture(tgfx::Context* context) {
+  auto env = JNIEnvironment::Current();
+  if (env == nullptr) {
+    return nullptr;
+  }
+  if (!attachToContext(env, context)) {
+    return nullptr;
+  }
+  if (!updateTexImage(env)) {
+    return nullptr;
+  }
+  if (oesTexture == nullptr) {
+    auto textureWidth = env->CallIntMethod(videoSurface.get(), VideoSurface_videoWidth);
+    auto textureHeight = env->CallIntMethod(videoSurface.get(), VideoSurface_videoHeight);
+    oesTexture = tgfx::Resource::Wrap(context, new OESTexture(glInfo, width, height));
+    oesTexture->setTextureSize(textureWidth, textureHeight);
+    oesTexture->attachedSurface.reset(env, videoSurface.get());
+  }
+  return oesTexture;
+}
+
+bool VideoSurface::attachToContext(JNIEnv* env, tgfx::Context* context) {
+  if (glInfo.id > 0) {
     if (deviceID != context->device()->uniqueID()) {
       LOGE("VideoSurface::attachToGLContext(): VideoSurface has already attached to a Context!");
       return false;
     }
     return true;
   }
-  auto gl = GLContext::Unwrap(context);
-  GLTextureInfo glInfo = {};
-  glInfo.target = GL::TEXTURE_EXTERNAL_OES;
-  glInfo.format = GL::RGBA8;
-  gl->genTextures(1, &glInfo.id);
-  oesTexture = Resource::Wrap(context, new OESTexture(glInfo, width, height, hasAlpha));
-  auto env = JNIEnvironment::Current();
-  if (env == nullptr) {
+  auto gl = tgfx::GLFunctions::Get(context);
+  tgfx::GLSampler sampler = {};
+  sampler.target = GL_TEXTURE_EXTERNAL_OES;
+  sampler.format = tgfx::PixelFormat::RGBA_8888;
+  gl->genTextures(1, &sampler.id);
+  if (sampler.id == 0) {
     return false;
   }
-  auto result = env->CallBooleanMethod(videoSurface.get(), VideoSurface_attachToGLContext,
-                                       oesTexture->getGLInfo().id);
-  deviceID = context->device()->uniqueID();
+  auto result =
+      env->CallBooleanMethod(videoSurface.get(), VideoSurface_attachToGLContext, sampler.id);
   if (!result) {
+    gl->deleteTextures(1, &sampler.id);
     LOGE("VideoSurface::attachToGLContext(): failed to attached to a Surface!");
-    oesTexture = nullptr;
-    deviceID = 0;
     return false;
   }
-  oesTexture->attachedSurface.reset(env, videoSurface.get());
+  glInfo = sampler;
+  deviceID = context->device()->uniqueID();
   return true;
 }
 
-void VideoSurface::markHasNewTextureImage() {
-  hasPendingTextureImage = true;
-}
-
-bool VideoSurface::updateTexImage() {
+bool VideoSurface::updateTexImage(JNIEnv* env) {
   if (!hasPendingTextureImage) {
     return false;
   }
-  auto env = JNIEnvironment::Current();
-  if (env == nullptr) {
-    return false;
-  }
-  bool status = env->CallBooleanMethod(videoSurface.get(), VideoSurface_updateTexImage);
+  auto result = env->CallBooleanMethod(videoSurface.get(), VideoSurface_updateTexImage);
   hasPendingTextureImage = false;
-  return status;
+  return result;
 }
 
-std::shared_ptr<OESTexture> VideoSurface::getTexture() {
-  if (oesTexture == nullptr) {
-    return nullptr;
-  }
-  if (oesTexture->textureWidth > 0) {
-    return oesTexture;
-  }
-  auto env = JNIEnvironment::Current();
-  if (env == nullptr) {
-    return nullptr;
-  }
-  auto textureWidth = env->CallIntMethod(videoSurface.get(), VideoSurface_videoWidth);
-  auto textureHeight = env->CallIntMethod(videoSurface.get(), VideoSurface_videoHeight);
-  oesTexture->setTextureSize(textureWidth, textureHeight);
-  return oesTexture;
-}
 }  // namespace pag

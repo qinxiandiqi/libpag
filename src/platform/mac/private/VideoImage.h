@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "video/VideoBuffer.h"
+#include <CoreVideo/CVPixelBuffer.h>
+#include "rendering/video/VideoBuffer.h"
 
 namespace pag {
 class VideoImage : public VideoBuffer {
@@ -30,8 +31,8 @@ class VideoImage : public VideoBuffer {
   size_t planeCount() const override;
 
  protected:
-  std::shared_ptr<Texture> makeTexture(Context* context) const override {
-    return Texture::MakeFrom(context, pixelBuffer);
+  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) const override {
+    return tgfx::Texture::MakeFrom(context, pixelBuffer);
   }
 
  private:

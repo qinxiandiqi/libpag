@@ -19,7 +19,7 @@
 #include "GLCaps.h"
 #include "GLUtil.h"
 
-namespace pag {
+namespace tgfx {
 static GLStandard GetGLStandard(const char* versionString) {
   if (versionString == nullptr) {
     return GLStandard::None;
@@ -86,7 +86,7 @@ GLInfo::GLInfo(GLGetString* getString, GLGetStringi* getStringi, GLGetIntegerv* 
       getIntegerv(getIntegerv),
       getInternalformativ(getInternalformativ),
       getShaderPrecisionFormat(getShaderPrecisionFormat) {
-  auto versionString = (const char*)getString(GL::VERSION);
+  auto versionString = (const char*)getString(GL_VERSION);
   auto glVersion = GetGLVersion(versionString);
   version = GL_VER(glVersion.majorVersion, glVersion.minorVersion);
   standard = GetGLStandard(versionString);
@@ -123,14 +123,14 @@ void GLInfo::fetchExtensions() {
   if (indexed) {
     if (getStringi) {
       int extensionCount = 0;
-      getIntegerv(GL::NUM_EXTENSIONS, &extensionCount);
+      getIntegerv(GL_NUM_EXTENSIONS, &extensionCount);
       for (int i = 0; i < extensionCount; ++i) {
-        const char* ext = reinterpret_cast<const char*>(getStringi(GL::EXTENSIONS, i));
+        const char* ext = reinterpret_cast<const char*>(getStringi(GL_EXTENSIONS, i));
         extensions.emplace_back(ext);
       }
     }
   } else {
-    auto text = reinterpret_cast<const char*>(getString(GL::EXTENSIONS));
+    auto text = reinterpret_cast<const char*>(getString(GL_EXTENSIONS));
     eatSpaceSepStrings(&extensions, text);
   }
 }
@@ -146,12 +146,12 @@ static bool IsMediumFloatFp32(const GLInfo& ctxInfo) {
     // We're on a desktop GL that doesn't have precision info. Assume they're all 32bit float.
     return true;
   }
-  // glGetShaderPrecisionFormat doesn't accept GL::GEOMETRY_SHADER as a shader type. Hopefully the
+  // glGetShaderPrecisionFormat doesn't accept GL_GEOMETRY_SHADER as a shader type. Hopefully the
   // geometry shaders don't have lower precision than vertex and fragment.
-  for (unsigned shader : {GL::FRAGMENT_SHADER, GL::VERTEX_SHADER}) {
+  for (unsigned shader : {GL_FRAGMENT_SHADER, GL_VERTEX_SHADER}) {
     int range[2];
     int bits;
-    ctxInfo.getShaderPrecisionFormat(shader, GL::MEDIUM_FLOAT, range, &bits);
+    ctxInfo.getShaderPrecisionFormat(shader, GL_MEDIUM_FLOAT, range, &bits);
     if (range[0] < 127 || range[1] < 127 || bits < 23) {
       return false;
     }
@@ -159,10 +159,14 @@ static bool IsMediumFloatFp32(const GLInfo& ctxInfo) {
   return true;
 }
 
+const GLCaps* GLCaps::Get(Context* context) {
+  return context ? static_cast<const GLCaps*>(context->caps()) : nullptr;
+}
+
 GLCaps::GLCaps(const GLInfo& info) {
   standard = info.standard;
   version = info.version;
-  vendor = GetVendorFromString((const char*)info.getString(GL::VENDOR));
+  vendor = GetVendorFromString((const char*)info.getString(GL_VENDOR));
   floatIs32Bits = IsMediumFloatFp32(info);
   switch (standard) {
     case GLStandard::GL:
@@ -177,34 +181,34 @@ GLCaps::GLCaps(const GLInfo& info) {
     default:
       break;
   }
-  info.getIntegerv(GL::MAX_TEXTURE_SIZE, &maxTextureSize);
-  info.getIntegerv(GL::MAX_TEXTURE_IMAGE_UNITS, &maxFragmentSamplers);
+  info.getIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+  info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxFragmentSamplers);
   initFSAASupport(info);
-  initConfigMap(info);
+  initFormatMap(info);
 }
 
-const TextureFormat& GLCaps::getTextureFormat(PixelConfig config) const {
-  return configMap.at(config).format;
+const TextureFormat& GLCaps::getTextureFormat(PixelFormat pixelFormat) const {
+  return pixelFormatMap.at(pixelFormat).format;
 }
 
-const Swizzle& GLCaps::configSwizzle(PixelConfig config) const {
-  return configMap.at(config).swizzle;
+const Swizzle& GLCaps::getSwizzle(PixelFormat pixelFormat) const {
+  return pixelFormatMap.at(pixelFormat).swizzle;
 }
 
-const Swizzle& GLCaps::configTextureSwizzle(PixelConfig config) const {
-  return configMap.at(config).textureSwizzle;
+const Swizzle& GLCaps::getTextureSwizzle(PixelFormat pixelFormat) const {
+  return pixelFormatMap.at(pixelFormat).textureSwizzle;
 }
 
-const Swizzle& GLCaps::configOutputSwizzle(PixelConfig config) const {
-  return configMap.at(config).outputSwizzle;
+const Swizzle& GLCaps::getOutputSwizzle(PixelFormat pixelFormat) const {
+  return pixelFormatMap.at(pixelFormat).outputSwizzle;
 }
 
-int GLCaps::getSampleCount(int requestedCount, PixelConfig config) const {
+int GLCaps::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
   if (requestedCount <= 1) {
     return 1;
   }
-  auto result = configMap.find(config);
-  if (result == configMap.end() || result->second.colorSampleCounts.empty()) {
+  auto result = pixelFormatMap.find(pixelFormat);
+  if (result == pixelFormatMap.end() || result->second.colorSampleCounts.empty()) {
     return 1;
   }
   for (auto colorSampleCount : result->second.colorSampleCounts) {
@@ -272,40 +276,40 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   semaphoreSupport = version >= GL_VER(2, 0);
 }
 
-void GLCaps::initConfigMap(const GLInfo& info) {
-  configMap[PixelConfig::RGBA_8888].format.sizedFormat = GL::RGBA8;
-  configMap[PixelConfig::RGBA_8888].format.externalFormat = GL::RGBA;
-  configMap[PixelConfig::RGBA_8888].swizzle = Swizzle::RGBA();
+void GLCaps::initFormatMap(const GLInfo& info) {
+  pixelFormatMap[PixelFormat::RGBA_8888].format.sizedFormat = GL_RGBA8;
+  pixelFormatMap[PixelFormat::RGBA_8888].format.externalFormat = GL_RGBA;
+  pixelFormatMap[PixelFormat::RGBA_8888].swizzle = Swizzle::RGBA();
   if (textureRedSupport) {
-    configMap[PixelConfig::ALPHA_8].format.sizedFormat = GL::R8;
-    configMap[PixelConfig::ALPHA_8].format.externalFormat = GL::RED;
-    configMap[PixelConfig::ALPHA_8].swizzle = Swizzle::RRRR();
-    // Shader output swizzles will default to RGBA. When we've use GL::RED instead of GL::ALPHA to
-    // implement PixelConfig::ALPHA_8 we need to swizzle the shader outputs so the alpha channel
+    pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL_R8;
+    pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL_RED;
+    pixelFormatMap[PixelFormat::ALPHA_8].swizzle = Swizzle::RRRR();
+    // Shader output swizzles will default to RGBA. When we've use GL_RED instead of GL_ALPHA to
+    // implement PixelFormat::ALPHA_8 we need to swizzle the shader outputs so the alpha channel
     // gets written to the single component.
-    configMap[PixelConfig::ALPHA_8].outputSwizzle = Swizzle::AAAA();
-    configMap[PixelConfig::Gray_8].format.sizedFormat = GL::R8;
-    configMap[PixelConfig::Gray_8].format.externalFormat = GL::RED;
-    configMap[PixelConfig::Gray_8].swizzle = Swizzle::RRRA();
-    configMap[PixelConfig::RG_88].format.sizedFormat = GL::RG8;
-    configMap[PixelConfig::RG_88].format.externalFormat = GL::RG;
-    configMap[PixelConfig::RG_88].swizzle = Swizzle::RGRG();
+    pixelFormatMap[PixelFormat::ALPHA_8].outputSwizzle = Swizzle::AAAA();
+    pixelFormatMap[PixelFormat::GRAY_8].format.sizedFormat = GL_R8;
+    pixelFormatMap[PixelFormat::GRAY_8].format.externalFormat = GL_RED;
+    pixelFormatMap[PixelFormat::GRAY_8].swizzle = Swizzle::RRRA();
+    pixelFormatMap[PixelFormat::RG_88].format.sizedFormat = GL_RG8;
+    pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL_RG;
+    pixelFormatMap[PixelFormat::RG_88].swizzle = Swizzle::RGRG();
   } else {
-    configMap[PixelConfig::ALPHA_8].format.sizedFormat = GL::ALPHA8;
-    configMap[PixelConfig::ALPHA_8].format.externalFormat = GL::ALPHA;
-    configMap[PixelConfig::ALPHA_8].swizzle = Swizzle::AAAA();
-    configMap[PixelConfig::Gray_8].format.sizedFormat = GL::LUMINANCE8;
-    configMap[PixelConfig::Gray_8].format.externalFormat = GL::LUMINANCE;
-    configMap[PixelConfig::Gray_8].swizzle = Swizzle::RGBA();
-    configMap[PixelConfig::RG_88].format.sizedFormat = GL::LUMINANCE8_ALPHA8;
-    configMap[PixelConfig::RG_88].format.externalFormat = GL::LUMINANCE_ALPHA;
-    configMap[PixelConfig::RG_88].swizzle = Swizzle::RARA();
+    pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL_ALPHA8;
+    pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL_ALPHA;
+    pixelFormatMap[PixelFormat::ALPHA_8].swizzle = Swizzle::AAAA();
+    pixelFormatMap[PixelFormat::GRAY_8].format.sizedFormat = GL_LUMINANCE8;
+    pixelFormatMap[PixelFormat::GRAY_8].format.externalFormat = GL_LUMINANCE;
+    pixelFormatMap[PixelFormat::GRAY_8].swizzle = Swizzle::RGBA();
+    pixelFormatMap[PixelFormat::RG_88].format.sizedFormat = GL_LUMINANCE8_ALPHA8;
+    pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL_LUMINANCE_ALPHA;
+    pixelFormatMap[PixelFormat::RG_88].swizzle = Swizzle::RARA();
   }
   // If we don't have texture swizzle support then the shader generator must insert the
   // swizzle into shader code.
   if (!textureSwizzleSupport) {
-    for (auto& config : configMap) {
-      config.second.textureSwizzle = config.second.swizzle;
+    for (auto& item : pixelFormatMap) {
+      item.second.textureSwizzle = item.second.swizzle;
     }
   }
   // ES 2.0 requires that the internal/external formats match.
@@ -313,7 +317,7 @@ void GLCaps::initConfigMap(const GLInfo& info) {
       (standard == GLStandard::GL || (standard == GLStandard::GLES && version >= GL_VER(3, 0)));
   bool useSizedRbFormats = standard == GLStandard::GLES || standard == GLStandard::WebGL;
 
-  for (auto& item : configMap) {
+  for (auto& item : pixelFormatMap) {
     auto& format = item.second.format;
     format.internalFormatTexImage = useSizedTexFormats ? format.sizedFormat : format.externalFormat;
     format.internalFormatRenderBuffer =
@@ -330,24 +334,24 @@ static bool UsesInternalformatQuery(GLStandard standard, const GLInfo& glInterfa
 }
 
 void GLCaps::initColorSampleCount(const GLInfo& info) {
-  std::vector<PixelConfig> pixelConfigs = {PixelConfig::RGBA_8888};
-  for (auto config : pixelConfigs) {
+  std::vector<PixelFormat> pixelFormats = {PixelFormat::RGBA_8888};
+  for (auto pixelFormat : pixelFormats) {
     if (UsesInternalformatQuery(standard, info, version)) {
       int count = 0;
-      unsigned format = configMap[config].format.internalFormatRenderBuffer;
-      info.getInternalformativ(GL::RENDERBUFFER, format, GL::NUM_SAMPLE_COUNTS, 1, &count);
+      unsigned format = pixelFormatMap[pixelFormat].format.internalFormatRenderBuffer;
+      info.getInternalformativ(GL_RENDERBUFFER, format, GL_NUM_SAMPLE_COUNTS, 1, &count);
       if (count) {
         int* temp = new int[count];
-        info.getInternalformativ(GL::RENDERBUFFER, format, GL::SAMPLES, count, temp);
+        info.getInternalformativ(GL_RENDERBUFFER, format, GL_SAMPLES, count, temp);
         // GL has a concept of MSAA rasterization with a single sample but we do not.
         if (temp[count - 1] == 1) {
           --count;
         }
         // We initialize our supported values with 1 (no msaa) and reverse the order
         // returned by GL so that the array is ascending.
-        configMap[config].colorSampleCounts.push_back(1);
+        pixelFormatMap[pixelFormat].colorSampleCounts.push_back(1);
         for (int j = 0; j < count; ++j) {
-          configMap[config].colorSampleCounts.push_back(temp[count - j - 1]);
+          pixelFormatMap[pixelFormat].colorSampleCounts.push_back(temp[count - j - 1]);
         }
         delete[] temp;
       }
@@ -356,9 +360,9 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
       // count.
       int maxSampleCnt = 1;
       if (MSFBOType::ES_IMG_MsToTexture == msFBOType) {
-        info.getIntegerv(GL::MAX_SAMPLES_IMG, &maxSampleCnt);
+        info.getIntegerv(GL_MAX_SAMPLES_IMG, &maxSampleCnt);
       } else if (MSFBOType::None != msFBOType) {
-        info.getIntegerv(GL::MAX_SAMPLES, &maxSampleCnt);
+        info.getIntegerv(GL_MAX_SAMPLES, &maxSampleCnt);
       }
       // Chrome has a mock GL implementation that returns 0.
       maxSampleCnt = std::max(1, maxSampleCnt);
@@ -368,7 +372,7 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
         if (samples > maxSampleCnt) {
           break;
         }
-        configMap[config].colorSampleCounts.push_back(samples);
+        pixelFormatMap[pixelFormat].colorSampleCounts.push_back(samples);
       }
     }
   }
@@ -418,4 +422,4 @@ bool GLCaps::usesMSAARenderBuffers() const {
 bool GLCaps::usesImplicitMSAAResolve() const {
   return MSFBOType::ES_IMG_MsToTexture == msFBOType || MSFBOType::ES_EXT_MsToTexture == msFBOType;
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/ImageInfo.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace pag {
-void TraceImage(const ImageInfo& info, const void* pixels, const std::string& tag);
+void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag);
 }

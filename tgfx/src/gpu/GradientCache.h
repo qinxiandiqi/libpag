@@ -21,11 +21,11 @@
 #include <list>
 #include <unordered_map>
 
-#include "core/Bitmap.h"
-#include "core/Color4f.h"
-#include "core/utils/BytesKey.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/BytesKey.h"
+#include "tgfx/core/Color.h"
 
-namespace pag {
+namespace tgfx {
 class Context;
 
 class GradientCache {
@@ -33,7 +33,7 @@ class GradientCache {
   explicit GradientCache(Context* context) : context(context) {
   }
 
-  const Texture* getGradient(const Color4f* colors, const float* positions, int count);
+  const Texture* getGradient(const Color* colors, const float* positions, int count);
 
   void releaseAll();
 
@@ -48,4 +48,4 @@ class GradientCache {
   std::list<BytesKey> keys = {};
   std::unordered_map<BytesKey, std::shared_ptr<Texture>, BytesHasher> textures = {};
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -81,8 +81,9 @@ enum class TagCode {
   CachePolicy = 30,
   FileAttributes = 31,
   TimeStretchMode = 32,
+  Mp4Header = 33,
 
-  // 33 ~ 44 are preserved
+  // 34 ~ 44 are preserved
 
   BitmapCompositionBlock = 45,
   BitmapSequence = 46,
@@ -1774,7 +1775,7 @@ class PAG_API Composition {
   Color backgroundColor = White;
 
   /**
-   * The audio data of this composition.
+   * The audio data of this composition, which is an AAC audio in an MPEG-4 container.
    */
   ByteData* audioBytes = nullptr;
   std::vector<Marker*> audioMarkers;
@@ -2002,7 +2003,10 @@ class PAG_API VideoFrame {
    */
   bool isKeyframe = false;
 
-  pag::Frame frame = 0;
+  /**
+   * The presentation frame index.
+   */
+  Frame frame = 0;
 
   /**
    * The file bytes of the video frame.
@@ -2032,11 +2036,17 @@ class PAG_API VideoSequence : public Sequence {
 
   std::vector<TimeRange> staticTimeRanges;
 
+  ByteData* MP4Header = nullptr;
+
   Frame duration() const override {
     return static_cast<Frame>(frames.size());
   }
 
   bool verify() const override;
+
+  int32_t getVideoWidth() const;
+
+  int32_t getVideoHeight() const;
 
   RTTR_ENABLE(Sequence)
 };

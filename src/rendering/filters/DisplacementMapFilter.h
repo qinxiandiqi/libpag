@@ -19,7 +19,7 @@
 #pragma once
 
 #include "LayerFilter.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 class RenderCache;
@@ -28,20 +28,20 @@ class DisplacementMapFilter : public LayerFilter {
   explicit DisplacementMapFilter(Effect* effect);
   ~DisplacementMapFilter() override = default;
 
-  void updateMapTexture(RenderCache* cache, const Graphic* mapGraphic, const Rect& bounds);
+  void updateMapTexture(RenderCache* cache, const Graphic* mapGraphic, const tgfx::Rect& bounds);
 
  protected:
   std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
+                      const tgfx::Point& filterScale) override;
 
  private:
   Effect* effect = nullptr;
-  Rect mapBounds = {};
-  std::shared_ptr<Surface> mapSurface = nullptr;
+  tgfx::Rect mapBounds = {};
+  std::shared_ptr<tgfx::Surface> mapSurface = nullptr;
 
   int useForDisplacementHandle = 0;
   int maxDisplacementHandle = 0;

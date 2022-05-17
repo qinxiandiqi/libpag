@@ -17,51 +17,54 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterBuffer.h"
-#include "gpu/opengl/GLUtil.h"
+#include "FilterHelper.h"
 
 namespace pag {
-std::shared_ptr<FilterBuffer> FilterBuffer::Make(Context* context, int width, int height,
+std::shared_ptr<FilterBuffer> FilterBuffer::Make(tgfx::Context* context, int width, int height,
                                                  bool usesMSAA) {
-  auto texture = GLTexture::MakeRGBA(context, width, height);
-  auto gl = GLContext::Unwrap(context);
-  auto sampleCount = usesMSAA ? gl->caps->getSampleCount(4, PixelConfig::RGBA_8888) : 1;
-  auto renderTarget = GLRenderTarget::MakeFrom(context, texture.get(), sampleCount);
-  if (renderTarget == nullptr) {
+  auto sampleCount = usesMSAA ? 4 : 1;
+  auto surface = tgfx::Surface::Make(context, width, height, false, sampleCount);
+  if (surface == nullptr) {
     return nullptr;
   }
   auto buffer = new FilterBuffer();
-  buffer->texture = texture;
-  buffer->renderTarget = renderTarget;
+  buffer->surface = surface;
   return std::shared_ptr<FilterBuffer>(buffer);
 }
 
-void FilterBuffer::resolve(Context* context) {
-  renderTarget->resolve(context);
+tgfx::GLFrameBuffer FilterBuffer::getFramebuffer() const {
+  auto renderTarget = std::static_pointer_cast<tgfx::GLRenderTarget>(surface->getRenderTarget());
+  return renderTarget->glFrameBuffer();
 }
 
-void FilterBuffer::clearColor(const GLInterface* gl) const {
-  renderTarget->clear(gl);
+tgfx::GLSampler FilterBuffer::getTexture() const {
+  auto texture = std::static_pointer_cast<tgfx::GLTexture>(surface->getTexture());
+  return texture->glSampler();
 }
 
-std::unique_ptr<FilterSource> FilterBuffer::toFilterSource(const Point& scale) const {
+void FilterBuffer::clearColor() const {
+  surface->getCanvas()->clear();
+}
+
+std::unique_ptr<FilterSource> FilterBuffer::toFilterSource(const tgfx::Point& scale) const {
   auto filterSource = new FilterSource();
-  filterSource->textureID = getTexture().id;
-  filterSource->width = texture->width();
-  filterSource->height = texture->height();
+  filterSource->sampler = getTexture();
+  filterSource->width = surface->width();
+  filterSource->height = surface->height();
   filterSource->scale = scale;
-  // TODO(domrjchen): 这里的 ImageOrigin 是错的
-  filterSource->textureMatrix =
-      ToGLTextureMatrix(Matrix::I(), texture->width(), texture->height(), ImageOrigin::BottomLeft);
+  filterSource->textureMatrix = ToGLTextureMatrix(tgfx::Matrix::I(), surface->width(),
+                                                  surface->height(), tgfx::ImageOrigin::TopLeft);
   return std::unique_ptr<FilterSource>(filterSource);
 }
 
-std::unique_ptr<FilterTarget> FilterBuffer::toFilterTarget(const Matrix& drawingMatrix) const {
+std::unique_ptr<FilterTarget> FilterBuffer::toFilterTarget(
+    const tgfx::Matrix& drawingMatrix) const {
   auto filterTarget = new FilterTarget();
-  filterTarget->frameBufferID = getFramebuffer().id;
-  filterTarget->width = renderTarget->width();
-  filterTarget->height = renderTarget->height();
-  filterTarget->vertexMatrix = ToGLVertexMatrix(drawingMatrix, renderTarget->width(),
-                                                renderTarget->height(), ImageOrigin::BottomLeft);
+  filterTarget->frameBuffer = getFramebuffer();
+  filterTarget->width = surface->width();
+  filterTarget->height = surface->height();
+  filterTarget->vertexMatrix = ToGLVertexMatrix(drawingMatrix, surface->width(), surface->height(),
+                                                tgfx::ImageOrigin::TopLeft);
   return std::unique_ptr<FilterTarget>(filterTarget);
 }
 }  // namespace pag

@@ -20,31 +20,34 @@
 
 #include "pag/pag.h"
 #include "rendering/graphics/Graphic.h"
+#include "tgfx/core/Image.h"
 
 namespace pag {
 
 class StillImage : public PAGImage {
  public:
-  static std::shared_ptr<StillImage> FromPixelBuffer(std::shared_ptr<PixelBuffer> pixelBuffer);
-  static std::shared_ptr<StillImage> FromImage(std::shared_ptr<Image> image);
+  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer);
 
-  void measureBounds(Rect* bounds) override;
-  void draw(Recorder* recorder) override;
+  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
 
  protected:
-  Rect getContentSize() const override;
+  std::shared_ptr<Graphic> getGraphic() override {
+    return graphic;
+  }
 
-  std::shared_ptr<Image> getImage() const override {
-    return image;
+  bool isStill() const override {
+    return true;
+  }
+
+  bool setContentTime(int64_t) override {
+    return false;
   }
 
  private:
-  int width = 0;
-  int height = 0;
-  std::shared_ptr<Image> image = nullptr;
-  std::shared_ptr<Graphic> graphic = nullptr;
+  StillImage(int width, int height) : PAGImage(width, height) {
+  }
 
-  void reset(std::shared_ptr<Graphic> graphic);
+  std::shared_ptr<Graphic> graphic = nullptr;
 
   friend class PAGImage;
 };

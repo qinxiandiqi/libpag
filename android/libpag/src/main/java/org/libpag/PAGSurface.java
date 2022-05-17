@@ -1,5 +1,6 @@
 package org.libpag;
 
+import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.opengl.EGL14;
 import android.opengl.EGLContext;
@@ -7,6 +8,7 @@ import android.os.Build;
 import android.view.Surface;
 
 import org.extra.tools.LibraryLoadUtils;
+import org.ffavc.DecoderFactory;
 
 public class PAGSurface {
     public static PAGSurface FromSurfaceTexture(SurfaceTexture surfaceTexture) {
@@ -154,6 +156,12 @@ public class PAGSurface {
     public native void freeCache();
 
     /**
+     * Returns a bitmap capturing the contents of the PAGSurface. Subsequent rendering of the
+     * PAGSurface will not be captured.
+     */
+    public native Bitmap makeSnapshot();
+
+    /**
      * Free up resources used by the PAGSurface instance immediately instead of relying on the
      * garbage collector to do this for you at some point in the future.
      */
@@ -177,6 +185,7 @@ public class PAGSurface {
     static {
         LibraryLoadUtils.loadLibrary("pag");
         nativeInit();
+        VideoDecoder.RegisterSoftwareDecoderFactory(DecoderFactory.GetHandle());
     }
 
     long nativeSurface = 0;

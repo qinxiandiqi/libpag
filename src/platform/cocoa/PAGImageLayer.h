@@ -23,7 +23,7 @@
 @class PAGImage;
 @class PAGVideoRange;
 
-__attribute__((visibility("default"))) @interface PAGImageLayer : PAGLayer
+PAG_API @interface PAGImageLayer : PAGLayer
 /**
  * Make a PAGImageLayer with size and duration(in microseconds).
  */
@@ -47,5 +47,10 @@ __attribute__((visibility("default"))) @interface PAGImageLayer : PAGLayer
  * replacement.
  */
 - (int64_t)contentDuration;
+
+/**
+ * The default image data of this layer, which is webp format.
+ */
+- (NSData*)imageBytes;
 
 @end

@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Orientation.h"
+#include "tgfx/core/Orientation.h"
 
-namespace pag {
+namespace tgfx {
 Matrix OrientationToMatrix(Orientation orientation, int width, int height) {
   auto w = static_cast<float>(width);
   auto h = static_cast<float>(height);
@@ -42,4 +42,11 @@ Matrix OrientationToMatrix(Orientation orientation, int width, int height) {
   }
   return Matrix::I();
 }
-}  // namespace pag
+
+void ApplyOrientation(Orientation orientation, int* width, int* height) {
+  if (orientation == Orientation::LeftTop || orientation == Orientation::RightTop ||
+      orientation == Orientation::RightBottom || orientation == Orientation::LeftBottom) {
+    std::swap(*width, *height);
+  }
+}
+}  // namespace tgfx

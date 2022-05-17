@@ -20,7 +20,7 @@
 
 #include <atomic>
 #include "VideoSurface.h"
-#include "video/VideoBuffer.h"
+#include "rendering/video/VideoBuffer.h"
 
 namespace pag {
 class VideoImage : public VideoBuffer {
@@ -33,7 +33,7 @@ class VideoImage : public VideoBuffer {
   }
 
  protected:
-  std::shared_ptr<Texture> makeTexture(Context* context) const override;
+  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) const override;
 
  private:
   mutable std::mutex locker = {};

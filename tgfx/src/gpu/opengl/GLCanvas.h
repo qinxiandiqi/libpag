@@ -19,11 +19,12 @@
 #pragma once
 
 #include "GLDrawer.h"
-#include "core/Blend.h"
-#include "core/Mask.h"
-#include "gpu/Canvas.h"
+#include "gpu/CanvasState.h"
+#include "tgfx/core/BlendMode.h"
+#include "tgfx/core/Mask.h"
+#include "tgfx/gpu/Canvas.h"
 
-namespace pag {
+namespace tgfx {
 class GLCanvas : public Canvas {
  public:
   explicit GLCanvas(Surface* surface);
@@ -34,6 +35,8 @@ class GLCanvas : public Canvas {
   void drawPath(const Path& path, const Paint& paint) override;
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint) override;
+  void drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect tex[],
+                 const Color colors[], size_t count) override;
 
  protected:
   void onSave() override {
@@ -47,22 +50,23 @@ class GLCanvas : public Canvas {
 
  private:
   std::shared_ptr<Surface> _clipSurface = nullptr;
+  uint32_t clipID = kDefaultClipID;
   std::shared_ptr<GLDrawer> _drawer = nullptr;
 
   GLDrawer* getDrawer();
 
-  Surface* getClipSurface();
+  Texture* getClipTexture();
 
   Matrix getViewMatrix();
 
-  std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceQuad, Rect* scissorRect);
+  std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
 
-  Rect clipLocalQuad(Rect localQuad, Rect* outClippedDeviceQuad);
+  Rect clipLocalBounds(Rect localBounds);
 
   void drawTexture(const Texture* texture, const RGBAAALayout* layout, const Texture* mask,
                    bool inverted);
 
-  void drawMask(Rect quad, const Texture* mask, const Shader* shader);
+  void drawMask(const Rect& bounds, const Texture* mask, const Shader* shader);
 
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                        const Font& font, const Paint& paint);
@@ -71,8 +75,7 @@ class GLCanvas : public Canvas {
 
   void fillPath(const Path& path, const Shader* shader);
 
-  void draw(const Rect& localQuad, const Rect& deviceQuad, std::unique_ptr<GLDrawOp> op,
-            std::unique_ptr<FragmentProcessor> color,
+  void draw(std::unique_ptr<GLDrawOp> op, std::unique_ptr<FragmentProcessor> color,
             std::unique_ptr<FragmentProcessor> mask = nullptr, bool aa = false);
 };
-}  // namespace pag
+}  // namespace tgfx

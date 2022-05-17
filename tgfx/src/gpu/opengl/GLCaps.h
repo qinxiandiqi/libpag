@@ -18,20 +18,20 @@
 
 #pragma once
 
+#include <string>
 #include <unordered_map>
-
-#include "GLDefines.h"
-#include "GLFunctions.h"
-#include "base/utils/EnumClassHash.h"
-#include "base/utils/Log.h"
-#include "gpu/Caps.h"
-#include "gpu/PixelConfig.h"
+#include <vector>
+#include "core/utils/EnumHasher.h"
+#include "core/utils/Log.h"
 #include "gpu/Swizzle.h"
-#include "pag/types.h"
+#include "tgfx/gpu/Caps.h"
+#include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 #define GL_VER(major, minor) ((static_cast<uint32_t>(major) << 16) | static_cast<uint32_t>(minor))
 
-namespace pag {
+namespace tgfx {
 enum class GLStandard { None, GL, GLES, WebGL };
 
 struct TextureFormat {
@@ -112,13 +112,11 @@ class GLCaps : public Caps {
  public:
   GLStandard standard = GLStandard::None;
   uint32_t version = 0;
-  GLVendor vendor;
-  int maxTextureSize = 0;
+  GLVendor vendor = GLVendor::Other;
   bool vertexArrayObjectSupport = false;
   bool packRowLengthSupport = false;
   bool unpackRowLengthSupport = false;
   bool textureRedSupport = false;
-  bool multisampleDisableSupport = false;
   MSFBOType msFBOType = MSFBOType::None;
   bool frameBufferFetchSupport = false;
   bool frameBufferFetchRequiresEnablePerSample = false;
@@ -129,17 +127,19 @@ class GLCaps : public Caps {
   bool textureSwizzleSupport = false;
   bool semaphoreSupport = false;
 
+  static const GLCaps* Get(Context* context);
+
   explicit GLCaps(const GLInfo& info);
 
-  const TextureFormat& getTextureFormat(PixelConfig config) const;
+  const TextureFormat& getTextureFormat(PixelFormat pixelFormat) const;
 
-  const Swizzle& configSwizzle(PixelConfig config) const;
+  const Swizzle& getSwizzle(PixelFormat pixelFormat) const;
 
-  const Swizzle& configTextureSwizzle(PixelConfig config) const;
+  const Swizzle& getTextureSwizzle(PixelFormat pixelFormat) const;
 
-  const Swizzle& configOutputSwizzle(PixelConfig config) const;
+  const Swizzle& getOutputSwizzle(PixelFormat pixelFormat) const;
 
-  int getSampleCount(int requestedCount, PixelConfig config) const;
+  int getSampleCount(int requestedCount, PixelFormat pixelFormat) const;
 
   /**
    * Does the preferred MSAA FBO extension have MSAA renderBuffers?
@@ -153,13 +153,13 @@ class GLCaps : public Caps {
   bool usesImplicitMSAAResolve() const;
 
  private:
-  std::unordered_map<PixelConfig, ConfigInfo, EnumClassHash> configMap = {};
+  std::unordered_map<PixelFormat, ConfigInfo, EnumHasher> pixelFormatMap = {};
 
-  void initConfigMap(const GLInfo& info);
+  void initFormatMap(const GLInfo& info);
   void initColorSampleCount(const GLInfo& info);
   void initGLSupport(const GLInfo& info);
   void initGLESSupport(const GLInfo& info);
   void initWebGLSupport(const GLInfo& info);
   void initFSAASupport(const GLInfo& info);
 };
-}  // namespace pag
+}  // namespace tgfx

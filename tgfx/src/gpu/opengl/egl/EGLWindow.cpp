@@ -16,11 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/egl/EGLWindow.h"
+#include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<EGLWindow> EGLWindow::Current() {
   auto device = EGLDevice::Current();
   if (device == nullptr) {
@@ -53,14 +54,15 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  GLFrameBufferInfo glInfo = {};
-  glInfo.id = 0;
-  glInfo.format = GL_RGBA8;
-  BackendRenderTarget renderTarget(glInfo, width, height);
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  GLFrameBuffer frameBuffer = {};
+  frameBuffer.id = 0;
+  frameBuffer.format = PixelFormat::RGBA_8888;
+  auto renderTarget =
+      GLRenderTarget::MakeFrom(context, frameBuffer, width, height, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(renderTarget);
 }
 
 void EGLWindow::onPresent(Context*, int64_t presentationTime) {
   std::static_pointer_cast<EGLDevice>(device)->swapBuffers(presentationTime);
 }
-}  // namespace pag
+}  // namespace tgfx

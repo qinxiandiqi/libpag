@@ -6,9 +6,11 @@
     "sourceMap": true,
     "esModuleInterop": true,
     "moduleResolution": "Node",
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "strict": true,
+    "outDir": "./lib"
   },
-  "files": ["src/pag.ts", "demo/index.ts"],
+  "include": ["src/**/*.ts", "demo/**/*.ts"],
   "typedocOptions": {
     "out": "./api-docs",
     "exclude": "**/**.js",

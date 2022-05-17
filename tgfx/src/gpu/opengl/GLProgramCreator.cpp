@@ -20,7 +20,7 @@
 #include "GLContext.h"
 #include "GLProgramBuilder.h"
 
-namespace pag {
+namespace tgfx {
 GLProgramCreator::GLProgramCreator(const GeometryProcessor* geometryProcessor,
                                    const Pipeline* pipeline)
     : geometryProcessor(geometryProcessor), pipeline(pipeline) {
@@ -32,7 +32,6 @@ void GLProgramCreator::computeUniqueKey(Context* context, BytesKey* bytesKey) co
 }
 
 std::unique_ptr<Program> GLProgramCreator::createProgram(Context* context) const {
-  const auto* gl = GLContext::Unwrap(context);
-  return GLProgramBuilder::CreateProgram(gl, geometryProcessor, pipeline);
+  return GLProgramBuilder::CreateProgram(context, geometryProcessor, pipeline);
 }
-}  // namespace pag
+}  // namespace tgfx

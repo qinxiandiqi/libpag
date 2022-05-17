@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Mask.h"
-#include "core/PathEffect.h"
+#include "tgfx/core/Mask.h"
+#include "tgfx/core/PathEffect.h"
 
-namespace pag {
+namespace tgfx {
 bool Mask::CanUseAsMask(const TextBlob* textBlob) {
   if (textBlob == nullptr) {
     return false;
@@ -64,4 +64,4 @@ bool Mask::strokeText(const TextBlob* textBlob, const Stroke& stroke) {
   fillPath(path);
   return true;
 }
-}  // namespace pag
+}  // namespace tgfx

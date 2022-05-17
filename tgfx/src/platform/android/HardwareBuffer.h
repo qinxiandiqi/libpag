@@ -20,9 +20,9 @@
 
 #include <android/hardware_buffer.h>
 #include "HardwareBufferInterface.h"
-#include "core/PixelBuffer.h"
+#include "tgfx/core/PixelBuffer.h"
 
-namespace pag {
+namespace tgfx {
 class HardwareBuffer : public PixelBuffer {
  public:
   static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
@@ -42,4 +42,4 @@ class HardwareBuffer : public PixelBuffer {
  private:
   AHardwareBuffer* hardwareBuffer = nullptr;
 };
-}  // namespace pag
+}  // namespace tgfx

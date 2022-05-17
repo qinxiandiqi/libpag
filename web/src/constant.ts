@@ -10,3 +10,7 @@ export const NALU_HEADER_LENGTH = 4;
  * Web safe font.
  */
 export const WEB_SAFE_FONT = 'Arial';
+/**
+ * Default render canvas size.
+ */
+export const DEFAULT_CANVAS_SIZE = 2560;

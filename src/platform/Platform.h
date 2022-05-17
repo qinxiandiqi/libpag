@@ -23,12 +23,12 @@
 #include <string>
 #include <unordered_map>
 #include "codec/NALUType.h"
-#include "core/ImageInfo.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace pag {
-struct VideoConfig;
+struct VideoFormat;
 class VideoDecoder;
-class Data;
 
 /**
  * Defines methods for native platforms to implement.
@@ -48,10 +48,10 @@ class Platform {
   virtual bool hasHardwareDecoder() const;
 
   /**
-   * Creates a hardware backed VideoDecoder with the specified video config. Returns nullptr if
+   * Creates a hardware backed VideoDecoder with the specified video format. Returns nullptr if
    * current platform has no hardware decoder support.
    */
-  virtual std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const;
+  virtual std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoFormat& format) const;
 
   /**
    * Implement this method to register the default fallback font list. User should call
@@ -68,6 +68,7 @@ class Platform {
   /**
    * Provides a utility to view the PixelMap data.
    */
-  virtual void traceImage(const ImageInfo& info, const void* pixels, const std::string& tag) const;
+  virtual void traceImage(const tgfx::ImageInfo& info, const void* pixels,
+                          const std::string& tag) const;
 };
 }  // namespace pag

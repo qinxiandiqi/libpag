@@ -11,48 +11,40 @@ project(PAG)
 include(./vendor_tools/vendor.cmake)
 
 # Options for building libpag
-option(PAG_USE_PNG_DECODE "allow use of embedded PNG library" ON)
-option(PAG_USE_PNG_ENCODE "allow use of embedded PNG library" ON)
-option(PAG_USE_JPEG_DECODE "allow use of embedded JPEG library" ON)
-option(PAG_USE_JPEG_ENCODE "allow use of embedded JPEG library" ON)
-option(PAG_USE_WEBP_DECODE "allow use of embedded WEBP library" ON)
-option(PAG_USE_WEBP_ENCODE "allow use of embedded WEBP library" ON)
-option(PAG_USE_FREETYPE "allow use of embedded freetype library" ON)
-option(PAG_USE_LIBAVC "allow use of embedded libavc as fallback video decoder" ON)
 option(PAG_USE_OPENGL "allow use of OpenGL as GPU backend" ON)
 option(PAG_USE_SWIFTSHADER "allow build with SwiftShader library" OFF)
 option(PAG_USE_QT "allow build with QT frameworks" OFF)
 option(PAG_USE_RTTR "enable RTTR support" OFF)
-option(PAG_BUILD_SHARED "Build shared library" ON)
-option(PAG_BUILD_TESTS "Build libpag tests" OFF)
 
-if (IOS)
-    set(PAG_USE_PNG_DECODE OFF CACHE BOOL "allow use of embedded PNG library" FORCE)
-    set(PAG_USE_PNG_ENCODE OFF CACHE BOOL "allow use of embedded PNG library" FORCE)
-    set(PAG_USE_JPEG_DECODE OFF CACHE BOOL "allow use of embedded JPEG library" FORCE)
-    set(PAG_USE_JPEG_ENCODE OFF CACHE BOOL "allow use of embedded JPEG library" FORCE)
-    set(PAG_USE_WEBP_ENCODE OFF CACHE BOOL "allow use of embedded WEBP library" FORCE)
-    set(PAG_USE_FREETYPE OFF CACHE BOOL "allow use of embedded freetype library" FORCE)
-elseif (ANDROID)
-    set(PAG_USE_PNG_ENCODE OFF CACHE BOOL "allow use of embedded PNG library" FORCE)
-    set(PAG_USE_JPEG_DECODE OFF CACHE BOOL "allow use of embedded JPEG library" FORCE)
-    set(PAG_USE_JPEG_ENCODE OFF CACHE BOOL "allow use of embedded JPEG library" FORCE)
-    set(PAG_USE_WEBP_DECODE OFF CACHE BOOL "allow use of embedded WEBP library" FORCE)
-    set(PAG_USE_WEBP_ENCODE OFF CACHE BOOL "allow use of embedded WEBP library" FORCE)
-    set(PAG_BUILD_SHARED ON CACHE BOOL "Build shared lib" FORCE)
-elseif (WEB)
-    set(PAG_USE_PNG_DECODE OFF CACHE BOOL "allow use of embedded PNG library" FORCE)
-    set(PAG_USE_PNG_ENCODE OFF CACHE BOOL "allow use of embedded PNG library" FORCE)
-    set(PAG_USE_JPEG_DECODE OFF CACHE BOOL "allow use of embedded JPEG library" FORCE)
-    set(PAG_USE_JPEG_ENCODE OFF CACHE BOOL "allow use of embedded JPEG library" FORCE)
-    set(PAG_USE_WEBP_ENCODE OFF CACHE BOOL "allow use of embedded WEBP library" FORCE)
-    set(PAG_USE_FREETYPE OFF CACHE BOOL "allow use of embedded freetype library" FORCE)
-    set(PAG_USE_LIBAVC OFF CACHE BOOL "allow use of embedded libavc as fallback video decoder" FORCE)
-    set(PAG_BUILD_SHARED OFF CACHE BOOL "Build shared library" FORCE)
-elseif (MACOS)
-    # CLion project needs test targets.
-    set(PAG_BUILD_TESTS ON CACHE BOOL "Build libpag tests" FORCE)
+if (NOT APPLE AND NOT WEB)
+    option(PAG_USE_FREETYPE "Allow use of embedded freetype library" ON)
 endif ()
+
+if (IOS OR WEB)
+    option(PAG_USE_WEBP_DECODE "Enable embedded WEBP decoding support" ON)
+elseif (NOT ANDROID)
+    option(PAG_USE_PNG_DECODE "Enable embedded PNG decoding support" ON)
+    option(PAG_USE_PNG_ENCODE "Enable embedded PNG encoding support" ON)
+    option(PAG_USE_JPEG_DECODE "Enable embedded JPEG decoding support" ON)
+    option(PAG_USE_JPEG_ENCODE "Enable embedded JPEG encoding support" ON)
+    option(PAG_USE_WEBP_DECODE "Enable embedded WEBP decoding support" ON)
+    option(PAG_USE_WEBP_ENCODE "Enable embedded WEBP encoding support" ON)
+endif ()
+
+if (NOT WEB)
+    option(PAG_USE_LIBAVC "allow use of embedded libavc as fallback video decoder" ON)
+    option(PAG_BUILD_SHARED "Build shared library" ON)
+endif ()
+
+if (MACOS)
+    # CLion project needs test targets.
+    option(PAG_BUILD_TESTS "Build libpag tests" ON)
+endif ()
+
+message("PAG_USE_LIBAVC: ${PAG_USE_LIBAVC}")
+message("PAG_USE_RTTR: ${PAG_USE_RTTR}")
+message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
+message("PAG_BUILD_TESTS: ${PAG_BUILD_TESTS}")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -65,38 +57,25 @@ endif ()
 
 if (MSVC)
     add_compile_options("/utf-8")
+    add_compile_options(/w44251 /w44275)
 endif (MSVC)
 
 # Sets flags
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-DDEBUG)
     #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g -O1")
-    #    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=leak -g -O1")
-    #    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread -fPIE -g -O1")
-    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=nullability -g -O1")
 endif ()
 
 # collects pag include directories.
-set(PAG_INCLUDES ./ include src tgfx/include tgfx/src)
+set(PAG_INCLUDES ./ include src)
 
 # collects pag source files.
 file(GLOB_RECURSE PAG_FILES
         src/base/*.*
         src/codec/*.*
-        src/rendering/*.*
-        tgfx/src/core/utils/*.*
-        tgfx/src/gpu/gradients/*.*)
-if (NOT WEB)
-    file(GLOB PAG_VIDEO_FILES src/video/*.*)
-    list(APPEND PAG_FILES ${PAG_VIDEO_FILES})
-endif ()
-file(GLOB PAG_COMMON_FILES
-        src/platform/*.*
-        tgfx/src/core/*.*
-        tgfx/src/core/images/*.*
-        tgfx/src/core/vectors/*.*
-        tgfx/src/gpu/*.*
-        tgfx/src/platform/*.*)
+        src/rendering/*.*)
+
+file(GLOB PAG_COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${PAG_COMMON_FILES})
 
 if (PAG_USE_QT)
@@ -109,102 +88,30 @@ else ()
     set(USE_NATIVE_PLATFORM ON)
 endif ()
 
-if (PAG_USE_FREETYPE)
-    # Freetype needs libpng
-    set(PAG_USE_PNG_DECODE ON)
+if (PAG_BUILD_TESTS)
+    set(PAG_USE_FREETYPE ON)
 endif ()
 
-if (PAG_USE_PNG_DECODE)
-    add_definitions(-DTGFX_USE_PNG_DECODE)
-    set(PAG_USE_PNG ON)
-endif ()
+set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
+set(TGFX_USE_QT ${PAG_USE_QT})
+set(TGFX_USE_SWIFTSHADER ${PAG_USE_SWIFTSHADER})
+set(TGFX_USE_FREETYPE ${PAG_USE_FREETYPE})
+set(TGFX_USE_PNG_DECODE ${PAG_USE_PNG_DECODE})
+set(TGFX_USE_PNG_ENCODE ${PAG_USE_PNG_ENCODE})
+set(TGFX_USE_JPEG_DECODE ${PAG_USE_JPEG_DECODE})
+set(TGFX_USE_JPEG_ENCODE ${PAG_USE_JPEG_ENCODE})
+set(TGFX_USE_WEBP_DECODE ${PAG_USE_WEBP_DECODE})
+set(TGFX_USE_WEBP_ENCODE ${PAG_USE_WEBP_ENCODE})
 
-if (PAG_USE_PNG_ENCODE)
-    add_definitions(-DTGFX_USE_PNG_ENCODE)
-    set(PAG_USE_PNG ON)
-endif ()
-
-if (PAG_USE_PNG)
-    set(PAG_USE_ZLIB ON)
-endif ()
-
-if (PAG_USE_JPEG_DECODE)
-    add_definitions(-DTGFX_USE_JPEG_DECODE)
-    set(PAG_USE_JPEG ON)
-endif ()
-
-if (PAG_USE_JPEG_ENCODE)
-    add_definitions(-DTGFX_USE_JPEG_ENCODE)
-    set(PAG_USE_JPEG ON)
-endif ()
-
-if (PAG_USE_WEBP_DECODE)
-    add_definitions(-DTGFX_USE_WEBP_DECODE)
-    set(PAG_USE_WEBP ON)
-endif ()
-
-if (PAG_USE_WEBP_ENCODE)
-    add_definitions(-DTGFX_USE_WEBP_ENCODE)
-    set(PAG_USE_WEBP ON)
-endif ()
-
-if (PAG_USE_OPENGL)
-    file(GLOB GFX_PLATFORM_FILES tgfx/src/gpu/opengl/*.*)
-    list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
-endif ()
-
-if (PAG_USE_FREETYPE)
-    add_definitions(-DTGFX_USE_FREETYPE)
-    list(APPEND PAG_STATIC_VENDORS freetype)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/vectors/freetype/*.*)
-    list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
-    list(APPEND PAG_INCLUDES third_party/freetype/include)
-elseif (WEB)
-    add_definitions(-DTGFX_BUILD_FOR_WEB)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/vectors/web/*.*)
-    list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
-elseif (APPLE)
-    # Uses CoreGraphics instead.
-    add_definitions(-DTGFX_USE_CORE_GRAPHICS)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/vectors/coregraphics/*.*)
-    list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
-endif ()
-
-if (PAG_USE_JPEG)
-    list(APPEND PAG_STATIC_VENDORS libjpeg-turbo)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/images/jpeg/*.*)
-    list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
-    list(APPEND PAG_INCLUDES third_party/out/libjpeg-turbo/${INCLUDE_ENTRY})
-endif ()
-
-if (PAG_USE_WEBP)
-    list(APPEND PAG_STATIC_VENDORS libwebp)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/images/webp/*.*)
-    list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
-    list(APPEND PAG_INCLUDES third_party/libwebp/src)
-endif ()
-
-if (PAG_USE_PNG)
-    list(APPEND PAG_STATIC_VENDORS libpng)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/images/png/*.*)
-    list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
-    list(APPEND PAG_INCLUDES third_party/out/libpng/${INCLUDE_ENTRY})
-endif ()
-
-if (PAG_USE_ZLIB)
-    if (NOT ANDROID)
-        list(APPEND PAG_STATIC_VENDORS zlib)
-    endif ()
-endif ()
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+add_subdirectory(tgfx/ EXCLUDE_FROM_ALL)
+list(APPEND PAG_INCLUDES tgfx/include)
 
 if (PAG_USE_LIBAVC)
     add_definitions(-DPAG_USE_LIBAVC)
     list(APPEND PAG_STATIC_VENDORS libavc)
     list(APPEND PAG_INCLUDES third_party/libavc/common third_party/libavc/decoder)
 endif ()
-
-list(APPEND SWIFTSHADER_INCLUDE_DIRS vendor/swiftshader/include)
-file(GLOB SWIFTSHADER_LIBRARIES vendor/swiftshader/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
 
 if (PAG_USE_QT)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
@@ -215,14 +122,11 @@ if (PAG_USE_QT)
     list(APPEND PAG_PLATFORM_SHARED_LIBS ${Qt5OpenGL_LIBRARIES} ${Qt5Gui_LIBRARIES} ${Qt5Quick_LIBRARIES})
     list(APPEND PAG_PLATFORM_INCLUDES ${Qt5OpenGL_INCLUDE_DIRS} ${Qt5Gui_INCLUDE_DIRS} ${Qt5Quick_INCLUDE_DIRS})
     file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/qt/*.*)
-    file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/qt/*.*)
-    list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
 elseif (PAG_USE_SWIFTSHADER)
+    file(GLOB SWIFTSHADER_LIBRARIES vendor/swiftshader/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND PAG_PLATFORM_SHARED_LIBS ${SWIFTSHADER_LIBRARIES})
-    list(APPEND PAG_PLATFORM_INCLUDES ${SWIFTSHADER_INCLUDE_DIRS})
+    list(APPEND PAG_PLATFORM_INCLUDES vendor/swiftshader/include)
     file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/swiftshader/*.*)
-    file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/egl/*.*)
-    list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
 endif ()
 
 if (PAG_USE_RTTR)
@@ -241,17 +145,10 @@ function(find_include_dirs out)
     set(${out} ${include_dirs} PARENT_SCOPE)
 endfunction()
 
-list(APPEND PAG_STATIC_VENDORS pathkit)
-list(APPEND PAG_INCLUDES third_party/pathkit)
-list(APPEND PAG_STATIC_VENDORS skcms)
-list(APPEND PAG_INCLUDES third_party/skcms)
-
 if (WEB)
     add_definitions(-DPAG_BUILD_FOR_WEB)
     if (USE_NATIVE_PLATFORM)
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/web/*.*)
-        file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/webgl/*.*)
-        list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
     endif ()
 elseif (IOS)
     # finds all required platform libraries.
@@ -278,22 +175,18 @@ elseif (IOS)
     find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
     list(APPEND PAG_PLATFORM_SHARED_LIBS ${ICONV_LIBRARIES})
 
-    if (PAG_USE_OPENGL)
-        find_library(OpenGLES_LIBS OpenGLES REQUIRED)
-        list(APPEND PAG_PLATFORM_SHARED_LIBS ${OpenGLES_LIBS})
-        add_definitions(-DGL_SILENCE_DEPRECATION)
-    else ()
-        # Uses Metal instead.
-        file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/gpu/metal/*.*)
-        list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
-        find_library(Metal_LIBS Metal REQUIRED)
-        list(APPEND PAG_PLATFORM_SHARED_LIBS ${Metal_LIBS})
-    endif ()
-
     if (USE_NATIVE_PLATFORM)
+        if (PAG_USE_OPENGL)
+            find_library(OpenGLES_LIBS OpenGLES REQUIRED)
+            list(APPEND PAG_PLATFORM_SHARED_LIBS ${OpenGLES_LIBS})
+            add_definitions(-DGL_SILENCE_DEPRECATION)
+        else ()
+            # Uses Metal instead.
+            find_library(Metal_LIBS Metal REQUIRED)
+            list(APPEND PAG_PLATFORM_SHARED_LIBS ${Metal_LIBS})
+        endif ()
+
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
-        file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/eagl/*.*)
-        list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
         find_include_dirs(IOS_PLATFORM_INCLUDES
                 src/platform/ios/*.h
                 src/platform/ios/private/*.h
@@ -318,20 +211,18 @@ elseif (MACOS)
     find_library(CORE_MEDIA CoreMedia)
     list(APPEND PAG_PLATFORM_SHARED_LIBS ${CORE_MEDIA})
 
-    if (PAG_USE_OPENGL)
-        find_library(OpenGL_LIBS OpenGL REQUIRED)
-        list(APPEND PAG_PLATFORM_SHARED_LIBS ${OpenGL_LIBS})
-        add_definitions(-DGL_SILENCE_DEPRECATION)
-    else ()
-        # Uses Metal instead.
-        file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/gpu/metal/*.*)
-        list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
-    endif ()
-
     if (USE_NATIVE_PLATFORM)
+        if (PAG_USE_OPENGL)
+            find_library(OpenGL_LIBS OpenGL REQUIRED)
+            list(APPEND PAG_PLATFORM_SHARED_LIBS ${OpenGL_LIBS})
+            add_definitions(-DGL_SILENCE_DEPRECATION)
+        else ()
+            # Uses Metal instead.
+            find_library(Metal_LIBS Metal REQUIRED)
+            list(APPEND PAG_PLATFORM_SHARED_LIBS ${Metal_LIBS})
+        endif ()
+
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
-        file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/cgl/*.*)
-        list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
         find_include_dirs(MAC_PLATFORM_INCLUDES
                 src/platform/mac/*.h
                 src/platform/mac/private/*.h
@@ -340,31 +231,23 @@ elseif (MACOS)
         list(APPEND PAG_PLATFORM_INCLUDES ${MAC_PLATFORM_INCLUDES})
     endif ()
 elseif (ANDROID)
-
-    # finds all required platform libraries.
     find_library(LOG_LIB log)
     list(APPEND PAG_PLATFORM_SHARED_LIBS ${LOG_LIB})
-    find_library(GLESV2_LIB GLESv2)
-    list(APPEND PAG_PLATFORM_SHARED_LIBS ${GLESV2_LIB})
-    find_library(EGL_LIB EGL)
-    list(APPEND PAG_PLATFORM_SHARED_LIBS ${EGL_LIB})
     find_library(ANDROID_LIB android)
     list(APPEND PAG_PLATFORM_SHARED_LIBS ${ANDROID_LIB})
     find_library(JNIGRAPHICS_LIB jnigraphics)
     list(APPEND PAG_PLATFORM_SHARED_LIBS ${JNIGRAPHICS_LIB})
-    if (PAG_USE_ZLIB)
-        find_library(Z_LIB z)
-        list(APPEND PAG_PLATFORM_SHARED_LIBS ${Z_LIB})
-    endif ()
 
     # optimizes the output size
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/android/libpag/export.def")
     add_compile_options(-ffunction-sections -fdata-sections -Os -fno-exceptions -fno-rtti)
 
     if (USE_NATIVE_PLATFORM)
+        find_library(GLESV2_LIB GLESv2)
+        list(APPEND PAG_PLATFORM_SHARED_LIBS ${GLESV2_LIB})
+        find_library(EGL_LIB EGL)
+        list(APPEND PAG_PLATFORM_SHARED_LIBS ${EGL_LIB})
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/android/*.*)
-        file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/egl/*.*)
-        list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
     endif ()
 elseif (WIN32)
     set(BUILD_USE_64BITS ON)
@@ -372,12 +255,10 @@ elseif (WIN32)
 
     if (USE_NATIVE_PLATFORM)
         list(APPEND PAG_PLATFORM_INCLUDES vendor/angle/include)
+        file(GLOB ANGLE_LIBS vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
+        list(APPEND PAG_PLATFORM_STATIC_LIBS ${ANGLE_LIBS})
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/win/*.*)
-        file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/egl/*.*)
-        list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
     endif ()
-    file(GLOB ANGLE_LIBS vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
-    list(APPEND PAG_PLATFORM_STATIC_LIBS ${ANGLE_LIBS})
     find_library(Bcrypt_LIB Bcrypt)
     list(APPEND PAG_PLATFORM_SHARED_LIBS ${Bcrypt_LIB})
     find_library(ws2_32_LIB ws2_32)
@@ -389,9 +270,11 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     list(APPEND PAG_PLATFORM_SHARED_LIBS dl)
     add_compile_options(-fPIC -pthread)
     if (USE_NATIVE_PLATFORM)
+        find_library(GLESV2_LIB GLESv2)
+        list(APPEND PAG_PLATFORM_SHARED_LIBS ${GLESV2_LIB})
+        find_library(EGL_LIB EGL)
+        list(APPEND PAG_PLATFORM_SHARED_LIBS ${EGL_LIB})
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/linux/*.*)
-        file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/egl/*.*)
-        list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
     endif ()
 endif ()
 
@@ -399,78 +282,73 @@ add_vendor_target(PAG STATIC_VENDORS ${PAG_STATIC_VENDORS} SHARED_VENDORS ${PAG_
 list(APPEND PAG_PLATFORM_STATIC_LIBS ${PAG_VENDOR_STATIC_LIBRARIES})
 list(APPEND PAG_PLATFORM_SHARED_LIBS ${PAG_VENDOR_SHARED_LIBRARIES})
 
-if (WEB)
-    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/web/*.*)
-elseif (IOS OR MACOS)
-    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/apple/*.*)
-elseif (ANDROID)
-    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/android/*.*)
-else ()
-    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/mock/*.*)
-endif ()
-
 if (PAG_BUILD_SHARED)
-    add_library(pag SHARED ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES} ${TGFX_PLATFORM_FILES})
+    add_library(pag SHARED ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
     target_compile_definitions(pag PUBLIC PAG_DLL)
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
-    target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
+    target_link_libraries(pag tgfx ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 else ()
-    add_library(pag STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES} ${TGFX_PLATFORM_FILES})
-    merge_libraries_into(pag ${PAG_PLATFORM_STATIC_LIBS})
+    add_library(pag STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES} $<TARGET_OBJECTS:tgfx>)
+    merge_libraries_into(pag ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS})
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
-    target_link_libraries(pag)
+    target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 endif ()
 
 if (PAG_BUILD_TESTS)
-    file(GLOB_RECURSE SWIFTSHADER_PLATFORM_FILES src/platform/swiftshader/*.*)
-    list(APPEND SWIFTSHADER_PLATFORM_FILES ${TGFX_PLATFORM_FILES})
-    file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/egl/*.*)
-    list(APPEND SWIFTSHADER_PLATFORM_FILES ${GL_PLATFORM_FILES})
-    add_library(pag-ss STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${SWIFTSHADER_PLATFORM_FILES})
-    merge_libraries_into(pag-ss ${PAG_PLATFORM_STATIC_LIBS})
-    target_include_directories(pag-ss PUBLIC ${PAG_INCLUDES} ${SWIFTSHADER_INCLUDE_DIRS})
-    target_link_libraries(pag-ss)
+    execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/HEAD "${HEAD_COMMIT}")
+    set(CacheVersionFile ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/version.json)
+    if (EXISTS ${CacheVersionFile})
+        execute_process(COMMAND git diff --name-only origin/main:test/baseline/version.json ${CacheVersionFile} OUTPUT_VARIABLE HAS_DIFF)
+    else ()
+        set(HAS_DIFF ON)
+    endif ()
+    if (HAS_DIFF)
+        message(WARNING "The local md5 cache is out of date! Please run the 'update_baseline.sh' to regenerate the cache.")
+    endif ()
+
+    add_library(pag-static STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES} $<TARGET_OBJECTS:tgfx>)
+    merge_libraries_into(pag-static ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS})
+    target_include_directories(pag-static PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
+    target_link_libraries(pag-static tgfx ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 
     list(APPEND TEST_STATIC_VENDORS googletest)
-    if (NOT PAG_USE_SWIFTSHADER)
-        list(APPEND TEST_PLATFORM_LIBS ${SWIFTSHADER_LIBRARIES})
-    endif ()
     add_vendor_target(Test STATIC_VENDORS ${TEST_STATIC_VENDORS} SHARED_VENDORS ${TEST_SHARED_VENDORS})
     list(APPEND TEST_PLATFORM_LIBS ${Test_VENDOR_STATIC_LIBRARIES})
     list(APPEND TEST_PLATFORM_LIBS ${Test_VENDOR_SHARED_LIBRARIES})
-    set(TEST_PLATFORM_SHARED_LIBS ${PAG_PLATFORM_SHARED_LIBS})
-    list(FILTER TEST_PLATFORM_SHARED_LIBS EXCLUDE REGEX "OpenGL")
-    list(APPEND TEST_PLATFORM_LIBS pag-ss ${TEST_PLATFORM_SHARED_LIBS})
+    list(APPEND TEST_PLATFORM_LIBS pag-static ${PAG_PLATFORM_SHARED_LIBS})
     set(TEST_INCLUDES third_party/googletest/googletest third_party/googletest/googletest/include third_party/json/include)
     list(APPEND TEST_INCLUDES ${PAG_INCLUDES})
 
     file(GLOB PAG_TEST_FILES
             test/*.*
             test/framework/*.*
-            test/framework/lzma/*.*
             test/framework/utils/*.*)
 
     file(GLOB PAG_SMOKE_TEST_FILES
             test/PAGSmokeTest.cpp
             test/TestUtils.cpp
             test/framework/*.cpp
-            test/framework/lzma/*.*
             test/framework/utils/*.cpp)
 
     file(GLOB PAG_PERFORMANCE_TEST_FILES
             test/PAGPerformanceTest.cpp
             test/TestUtils.cpp
             test/framework/*.cpp
-            test/framework/lzma/*.*
             test/framework/utils/*.cpp)
 
     file(GLOB FFAVC_LIB vendor/ffavc/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
-    list(APPEND TEST_INCLUDES vendor/ffavc/include)
+    list(APPEND TEST_INCLUDES tgfx/src vendor/ffavc/include)
+
+    add_executable(PAGBaseline ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
+    target_include_directories(PAGBaseline PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(PAGBaseline PUBLIC UPDATE_BASELINE)
+    target_link_libraries(PAGBaseline ${TEST_PLATFORM_LIBS})
+    set_target_properties(PAGBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
     add_executable(PAGUnitTest ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})
-    # skip the PAGCompareFrameTest test case in PAGUnitTest
     target_compile_definitions(PAGUnitTest PUBLIC SKIP_FRAME_COMPARE)
     target_link_libraries(PAGUnitTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGUnitTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
@@ -480,13 +358,8 @@ if (PAG_BUILD_TESTS)
     target_link_libraries(PAGFullTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGFullTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGSmokeTest ${Test_VENDOR_TARGET} ${PAG_SMOKE_TEST_FILES})
-    target_include_directories(PAGSmokeTest PUBLIC ${TEST_INCLUDES})
-    target_link_libraries(PAGSmokeTest ${TEST_PLATFORM_LIBS})
-    target_compile_definitions(PAGSmokeTest PUBLIC SMOKE_TEST SKIP_FRAME_COMPARE)
-
     add_executable(PAGPerformanceTest ${Test_VENDOR_TARGET} ${PAG_PERFORMANCE_TEST_FILES})
     target_include_directories(PAGPerformanceTest PUBLIC ${TEST_INCLUDES})
-    target_link_libraries(PAGPerformanceTest ${TEST_PLATFORM_LIBS})
     target_compile_definitions(PAGPerformanceTest PUBLIC PERFORMANCE_TEST)
+    target_link_libraries(PAGPerformanceTest ${TEST_PLATFORM_LIBS})
 endif ()

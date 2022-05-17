@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MotionTileFilter.h"
-#include "gpu/opengl/GLUtil.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
@@ -99,7 +98,8 @@ std::string MotionTileFilter::onBuildFragmentShader() {
   return MOTIONTILE_FRAGMENT_SHADER;
 }
 
-void MotionTileFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void MotionTileFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
+  auto gl = tgfx::GLFunctions::Get(context);
   tileCenterHandle = gl->getUniformLocation(program, "uTileCenter");
   tileWidthHandle = gl->getUniformLocation(program, "uTileWidth");
   tileHeightHandle = gl->getUniformLocation(program, "uTileHeight");
@@ -110,8 +110,8 @@ void MotionTileFilter::onPrepareProgram(const GLInterface* gl, unsigned int prog
   isHorizontalPhaseShiftHandle = gl->getUniformLocation(program, "uIsHorizontalPhaseShift");
 }
 
-void MotionTileFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                                      const Point&) {
+void MotionTileFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
+                                      const tgfx::Point&) {
   auto* pagEffect = reinterpret_cast<const MotionTileEffect*>(effect);
   auto tileCenter = pagEffect->tileCenter->getValueAt(layerFrame);
   auto tileWidth = pagEffect->tileWidth->getValueAt(layerFrame);
@@ -121,9 +121,9 @@ void MotionTileFilter::onUpdateParams(const GLInterface* gl, const Rect& content
   auto mirrorEdges = pagEffect->mirrorEdges->getValueAt(layerFrame);
   auto phase = pagEffect->phase->getValueAt(layerFrame);
   auto isHorizontalPhaseShift = pagEffect->horizontalPhaseShift->getValueAt(layerFrame);
-
+  auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform2f(tileCenterHandle, (tileCenter.x - contentBounds.x()) / contentBounds.width(),
-                1.0f - (tileCenter.y - contentBounds.y()) / contentBounds.height());
+                (tileCenter.y - contentBounds.y()) / contentBounds.height());
   gl->uniform1f(tileWidthHandle, tileWidth / 100.f);
   gl->uniform1f(tileHeightHandle, tileHeight / 100.f);
   gl->uniform1f(outputWidthHandle, outputWidth / 100.f);

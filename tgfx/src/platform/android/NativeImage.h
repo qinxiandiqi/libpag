@@ -19,9 +19,9 @@
 #pragma once
 
 #include "JNIUtil.h"
-#include "core/Image.h"
+#include "tgfx/core/Image.h"
 
-namespace pag {
+namespace tgfx {
 class NativeImage : public Image {
  public:
   static void JNIInit(JNIEnv* env);
@@ -31,6 +31,7 @@ class NativeImage : public Image {
  private:
   std::string imagePath;
   std::shared_ptr<Data> imageBytes;
+  Global<jobject> bitmap;
 
   NativeImage(int width, int height, Orientation orientation) : Image(width, height, orientation){};
 
@@ -38,4 +39,4 @@ class NativeImage : public Image {
 
   friend class NativeCodec;
 };
-}  // namespace pag
+}  // namespace tgfx

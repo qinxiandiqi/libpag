@@ -22,52 +22,16 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Recorder.h"
-#include "rendering/readers/BitmapSequenceReader.h"
+#include "rendering/sequences/SequenceProxy.h"
 
 namespace pag {
-class SequenceProxy : public TextureProxy {
- public:
-  SequenceProxy(Sequence* sequence, Frame frame, int width, int height)
-      : TextureProxy(width, height), sequence(sequence), frame(frame) {
-  }
-
-  bool cacheEnabled() const override {
-    return !sequence->composition->staticContent();
-  }
-
-  void prepare(RenderCache* cache) const override {
-    static_cast<RenderCache*>(cache)->prepareSequenceReader(sequence, frame,
-                                                            DecodingPolicy::SoftwareToHardware);
-  }
-
-  std::shared_ptr<Texture> getTexture(RenderCache* cache) const override {
-    auto reader = static_cast<RenderCache*>(cache)->getSequenceReader(sequence);
-    if (reader) {
-      return reader->readTexture(frame, static_cast<RenderCache*>(cache));
-    }
-    return nullptr;
-  }
-
- private:
-  Sequence* sequence = nullptr;
-  Frame frame = 0;
-};
-
 static std::shared_ptr<Graphic> MakeVideoSequenceGraphic(VideoSequence* sequence,
                                                          Frame contentFrame) {
-  // 视频序列帧导出时没有记录准确的画面总宽高，需要自己通过 width 和 alphaStartX 计算，
-  // 如果遇到奇数尺寸导出插件会自动加一，这里匹配导出插件的规则。
-  auto videoWidth = sequence->alphaStartX + sequence->width;
-  if (videoWidth % 2 == 1) {
-    videoWidth++;
-  }
-  auto videoHeight = sequence->alphaStartY + sequence->height;
-  if (videoHeight % 2 == 1) {
-    videoHeight++;
-  }
-  auto proxy = new SequenceProxy(sequence, contentFrame, videoWidth, videoHeight);
-  RGBAAALayout layout = {sequence->width, sequence->height, sequence->alphaStartX,
-                         sequence->alphaStartY};
+  auto factory = std::make_unique<SequenceReaderFactory>(sequence);
+  auto proxy = new SequenceProxy(sequence->getVideoWidth(), sequence->getVideoHeight(),
+                                 std::move(factory), contentFrame);
+  tgfx::RGBAAALayout layout = {sequence->width, sequence->height, sequence->alphaStartX,
+                               sequence->alphaStartY};
   return Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy),
                            layout);
 }
@@ -111,12 +75,14 @@ std::shared_ptr<Graphic> RenderSequenceComposition(Composition* composition,
   if (composition->type() == CompositionType::Video) {
     graphic = MakeVideoSequenceGraphic(static_cast<VideoSequence*>(sequence), sequenceFrame);
   } else {
-    auto proxy = new SequenceProxy(sequence, sequenceFrame, sequence->width, sequence->height);
+    auto factory = std::make_unique<SequenceReaderFactory>(sequence);
+    auto proxy =
+        new SequenceProxy(sequence->width, sequence->height, std::move(factory), sequenceFrame);
     graphic =
         Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy));
   }
   auto scaleX = static_cast<float>(composition->width) / static_cast<float>(sequence->width);
   auto scaleY = static_cast<float>(composition->height) / static_cast<float>(sequence->height);
-  return Graphic::MakeCompose(graphic, Matrix::MakeScale(scaleX, scaleY));
+  return Graphic::MakeCompose(graphic, tgfx::Matrix::MakeScale(scaleX, scaleY));
 }
 }  // namespace pag

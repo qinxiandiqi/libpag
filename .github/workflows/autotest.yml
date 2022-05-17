@@ -5,9 +5,9 @@ name: autotest
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
-  push:
-    branches: [ main ]
   pull_request:
+    branches: [ main ]
+  push:
     branches: [ main ]
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -28,73 +28,66 @@ jobs:
             /usr/local/Cellar/node
             /usr/local/bin/node
             /usr/local/Cellar/emscripten
-            /usr/local/bin/emscripten
+            /usr/local/bin/em++
+            /usr/local/bin/em-config
+            /usr/local/bin/emar
+            /usr/local/bin/emcc
+            /usr/local/bin/emcmake
+            /usr/local/bin/emconfigure
+            /usr/local/bin/emlink.py
+            /usr/local/bin/emmake
+            /usr/local/bin/emranlib
+            /usr/local/bin/emrun
+            /usr/local/bin/emscons
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
-            /usr/local/Cellar/depsync
             /usr/local/bin/depsync
-          key: libpag-environment-20220208
-      - if: github.event_name == 'push'
-        name: Get libpag cache (push)
-        id: libpag-push
-        uses: actions/cache@v2
-        with:
-          path: libpag.tar.zst
-          key: libpag-code-${{ github.sha }}
+            /usr/local/lib/node_modules/depsync
+            /usr/local/Cellar/gcovr
+            /usr/local/bin/gcovr
+          key: libpag-environment-autotest-20220402
           restore-keys: |
-            libpag-code-${{ github.event.before }}
-            libpag-code-
-      - if: github.event_name == 'pull_request'
-        name: Get libpag cache (pull_request)
-        id: libpag-pull_request
+            libpag-environment-
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Get thirdParty cache
+        id: cache-thirdParty
         uses: actions/cache@v2
         with:
-          path: libpag.tar.zst
-          key: libpag-code-${{ github.event.pull_request.base.sha }}
-          restore-keys: libpag-code-
-      - name: Check file existence
-        id: check_files
-        uses: andstor/file-existence-action@v1
-        with:
-          files: "libpag.tar.zst"
-      - name: File exist
-        if: steps.check_files.outputs.files_exists == 'true'
-        # Only runs if all of the files exists
+          path: |
+            third_party
+            vendor_tools
+            test/baseline/.cache
+          key: third_party-autotest-01-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: third_party-autotest-
+      - name: Run sync_deps script
         run: |
-          echo "file exist"
-          tar xvf libpag.tar.zst
-          rm -rf libpag.tar.zst
-      - name: File not exist
-        if: steps.check_files.outputs.files_exists != 'true'
-        run: |
-          echo "file not exist"
-          git clone -b main https://github.com/Tencent/libpag.git
-      - if: github.event_name == 'push'
-        name: Swith branch (push)
-        run: |
-          cd libpag
-          git pull
-      - if: github.event_name == 'pull_request'
-        name: Swith branch (pull_request)
-        run: |
-            cd libpag
-            git pull
-            git checkout ${{ github.head_ref }}
-
-      - name: brew link emscripten
-        if: steps.cache-environment.outputs.cache-hit == 'true'
-        run: |
-           brew link emscripten
-
-      - name: Run autotest script
-        run: |
-          cd libpag
           chmod +x sync_deps.sh
           ./sync_deps.sh
+        shell: bash
+
+      - if: github.event_name == 'push'
+        name: Build cache（push）
+        run: |
+          node build_vendor -p mac
+          if [ ! $(which gcovr) ]; then
+            brew install gcovr
+          fi
+          chmod +x update_baseline.sh
+          ./update_baseline.sh 1
+          mkdir result
+          cp -r test/baseline result
+
+      - if: github.event_name == 'pull_request'
+        name: Run autotest script
+        run: |
           chmod +x autotest.sh
           ./autotest.sh
-        shell: bash
+
       - name: codecov
+        if: github.event_name == 'pull_request'
         uses: codecov/codecov-action@v2.1.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -104,16 +97,8 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: result
-          path: libpag/result
+          path: result
       - uses: actions/upload-artifact@v2
         with:
           name: result
-          path: libpag/result
-      - name: Compress libpag
-        run: |
-          cd libpag
-          rm -rf result
-          git checkout main
-          cd ..
-          tar cvfa libpag.tar.zst libpag
-
+          path: result

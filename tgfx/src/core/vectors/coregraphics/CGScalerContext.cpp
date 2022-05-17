@@ -17,13 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/vectors/coregraphics/CGScalerContext.h"
-#include "base/utils/Interpolate.h"
-#include "base/utils/Log.h"
-#include "base/utils/MathExtra.h"
-#include "core/PathEffect.h"
+#include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/PathEffect.h"
 
-namespace pag {
+namespace tgfx {
+inline float Interpolate(const float& a, const float& b, const float& t) {
+  return a + (b - a) * t;
+}
+
 /**
  * Interpolate along the function described by (keys[length], values[length])
  * for the passed searchKey. SearchKeys outside the range keys[0]-keys[Length]
@@ -96,6 +99,12 @@ CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> typeface, CGScalerCon
   transform = MatrixToCGAffineTransform(matrix);
   ctFont =
       CTFontCreateCopyWithAttributes(font, static_cast<CGFloat>(rec.textSize), nullptr, nullptr);
+}
+
+CGScalerContext::~CGScalerContext() {
+  if (ctFont) {
+    CFRelease(ctFont);
+  }
 }
 
 FontMetrics CGScalerContext::generateFontMetrics() {
@@ -304,4 +313,4 @@ std::shared_ptr<TextureBuffer> CGScalerContext::generateImage(GlyphID glyphID, M
   }
   return pixelBuffer;
 }
-}  // namespace pag
+}  // namespace tgfx

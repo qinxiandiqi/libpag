@@ -18,11 +18,11 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 class GLProcGetter;
-class GLInterface;
+class GLFunctions;
 class GLInfo;
 
-void GLAssembleWebGLInterface(const GLProcGetter* getter, GLInterface* interface,
+void GLAssembleWebGLInterface(const GLProcGetter* getter, GLFunctions* functions,
                               const GLInfo& info);
-}  // namespace pag
+}  // namespace tgfx

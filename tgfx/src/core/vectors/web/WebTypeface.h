@@ -21,17 +21,17 @@
 #include <emscripten/val.h>
 #include <unordered_map>
 #include <vector>
-#include "core/Font.h"
-#include "core/Typeface.h"
+#include "tgfx/core/Font.h"
+#include "tgfx/core/Typeface.h"
 
-namespace pag {
+namespace tgfx {
 class WebTypeface : public Typeface {
  public:
-  static std::shared_ptr<WebTypeface> Make(const std::string& name);
+  static std::shared_ptr<WebTypeface> Make(const std::string& name, const std::string& style = "");
 
   ~WebTypeface() override;
 
-  ID uniqueID() const override {
+  uint32_t uniqueID() const override {
     return _uniqueID;
   }
 
@@ -40,7 +40,7 @@ class WebTypeface : public Typeface {
   }
 
   std::string fontStyle() const override {
-    return "";
+    return style;
   }
 
   int glyphsCount() const override {
@@ -74,12 +74,14 @@ class WebTypeface : public Typeface {
                                                bool fauxItalic, Matrix* matrix) const override;
 
  private:
-  explicit WebTypeface(std::string name);
+  explicit WebTypeface(std::string name, std::string style);
 
-  ID _uniqueID;
+  uint32_t _uniqueID;
   std::unordered_map<float, FontMetrics>* fontMetricsMap =
       new std::unordered_map<float, FontMetrics>;
   emscripten::val scalerContextClass = emscripten::val::null();
   std::string name;
+  std::string style;
+  std::string webFontFamily;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -1,13 +1,7 @@
 import { NativeImage } from './native-image';
 import { measureText } from '../utils/measure-text';
-import { defaultFontNames } from '../utils/font-family';
-
-export interface Bounds {
-  top: number;
-  left: number;
-  bottom: number;
-  right: number;
-}
+import { defaultFontNames, getFontFamilies } from '../utils/font-family';
+import { Rect } from '../types';
 
 const canvas = ((): HTMLCanvasElement | OffscreenCanvas => {
   try {
@@ -25,7 +19,7 @@ canvas.height = 10;
 const testCanvas = document.createElement('canvas');
 testCanvas.width = 1;
 testCanvas.height = 1;
-const testContext = testCanvas.getContext('2d');
+const testContext = testCanvas.getContext('2d') as CanvasRenderingContext2D;
 testContext.textBaseline = 'top';
 testContext.font = '100px -no-font-family-here-';
 testContext.scale(0.01, 0.01);
@@ -34,7 +28,9 @@ testContext.globalCompositeOperation = 'copy';
 
 export class ScalerContext {
   public static canvas: HTMLCanvasElement | OffscreenCanvas = canvas;
-  public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D = canvas.getContext('2d');
+  public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D = canvas.getContext('2d') as
+    | CanvasRenderingContext2D
+    | OffscreenCanvasRenderingContext2D;
 
   public static isEmoji(text: string): boolean {
     testContext.fillText(text, 0, 0);
@@ -43,30 +39,36 @@ export class ScalerContext {
   }
 
   private readonly fontName: string;
+  private readonly fontStyle: string;
   private readonly size: number;
   private readonly fauxBold: boolean;
   private readonly fauxItalic: boolean;
 
-  private fontBoundingBoxMap: { key: string; value: Bounds }[] = [];
+  private fontBoundingBoxMap: { key: string; value: Rect }[] = [];
 
-  public constructor(fontName: string, size: number, fauxBold = false, fauxItalic = false) {
+  public constructor(fontName: string, fontStyle: string, size: number, fauxBold = false, fauxItalic = false) {
     this.fontName = fontName;
+    this.fontStyle = fontStyle;
     this.size = size;
     this.fauxBold = fauxBold;
     this.fauxItalic = fauxItalic;
   }
 
   public fontString() {
-    const fallbackFontNames = defaultFontNames.concat();
-    fallbackFontNames.unshift(this.fontName);
     const attributes = [];
-    if (this.fauxBold) {
-      attributes.push('bold');
-    }
+    // css font-style
     if (this.fauxItalic) {
       attributes.push('italic');
     }
+    // css font-weight
+    if (this.fauxBold) {
+      attributes.push('bold');
+    }
+    // css font-size
     attributes.push(`${this.size}px`);
+    // css font-family
+    const fallbackFontNames = defaultFontNames.concat();
+    fallbackFontNames.unshift(...getFontFamilies(this.fontName, this.fontStyle));
     attributes.push(`${fallbackFontNames.join(',')}`);
     return attributes.join(' ');
   }
@@ -82,7 +84,7 @@ export class ScalerContext {
     context.font = this.fontString();
     const metrics = this.measureText(context, text);
 
-    const bounds: Bounds = {
+    const bounds: Rect = {
       left: Math.floor(-metrics.actualBoundingBoxLeft),
       top: Math.floor(-metrics.actualBoundingBoxAscent),
       right: Math.ceil(metrics.actualBoundingBoxRight),
@@ -106,11 +108,11 @@ export class ScalerContext {
     };
   }
 
-  public generateImage(text: string, bounds): NativeImage {
+  public generateImage(text: string, bounds: Rect): NativeImage {
     const canvas = document.createElement('canvas');
     canvas.width = bounds.right - bounds.left;
     canvas.height = bounds.bottom - bounds.top;
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d') as CanvasRenderingContext2D;
     context.font = this.fontString();
     context.fillText(text, -bounds.left, -bounds.top);
     return new NativeImage(canvas);
@@ -129,7 +131,7 @@ export class ScalerContext {
     const { left, top, right, bottom } = measureText(imageData);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    let fontMeasure: Bounds;
+    let fontMeasure: Rect;
     const fontBoundingBox = this.fontBoundingBoxMap.find((item) => item.key === this.fontName);
     if (fontBoundingBox) {
       fontMeasure = fontBoundingBox.value;

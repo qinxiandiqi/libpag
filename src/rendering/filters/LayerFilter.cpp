@@ -24,7 +24,6 @@
 #include "MosaicFilter.h"
 #include "MotionTileFilter.h"
 #include "RadialBlurFilter.h"
-#include "gpu/opengl/GLUtil.h"
 #include "rendering/filters/dropshadow/DropShadowFilter.h"
 #include "rendering/filters/gaussblur/GaussBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
@@ -57,19 +56,20 @@ static constexpr char FRAGMENT_SHADER[] = R"(
     }
 )";
 
-std::vector<Point> ComputeVerticesForMotionBlurAndBulge(const Rect& inputBounds,
-                                                        const Rect& outputBounds) {
-  std::vector<Point> vertices = {};
-  Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
-                           {outputBounds.right, outputBounds.bottom},
-                           {outputBounds.left, outputBounds.top},
-                           {outputBounds.right, outputBounds.top}};
+std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,
+                                                              const tgfx::Rect& outputBounds) {
+  std::vector<tgfx::Point> vertices = {};
+  tgfx::Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
+                                 {outputBounds.right, outputBounds.bottom},
+                                 {outputBounds.left, outputBounds.top},
+                                 {outputBounds.right, outputBounds.top}};
   auto deltaX = outputBounds.left - inputBounds.left;
   auto deltaY = outputBounds.top - inputBounds.top;
-  Point texturePoints[4] = {{deltaX, (outputBounds.height() + deltaY)},
-                            {(outputBounds.width() + deltaX), (outputBounds.height() + deltaY)},
-                            {deltaX, deltaY},
-                            {(outputBounds.width() + deltaX), deltaY}};
+  tgfx::Point texturePoints[4] = {
+      {deltaX, (outputBounds.height() + deltaY)},
+      {(outputBounds.width() + deltaX), (outputBounds.height() + deltaY)},
+      {deltaX, deltaY},
+      {(outputBounds.width() + deltaX), deltaY}};
   for (int ii = 0; ii < 4; ii++) {
     vertices.push_back(contentPoint[ii]);
     vertices.push_back(texturePoints[ii]);
@@ -77,25 +77,25 @@ std::vector<Point> ComputeVerticesForMotionBlurAndBulge(const Rect& inputBounds,
   return vertices;
 }
 
-std::shared_ptr<const FilterProgram> FilterProgram::Make(Context* context,
+std::shared_ptr<const FilterProgram> FilterProgram::Make(tgfx::Context* context,
                                                          const std::string& vertex,
                                                          const std::string& fragment) {
-  auto gl = GLContext::Unwrap(context);
-  auto program = CreateProgram(gl, vertex, fragment);
+  auto gl = tgfx::GLFunctions::Get(context);
+  auto program = CreateGLProgram(context, vertex, fragment);
   if (program == 0) {
     return nullptr;
   }
   auto filterProgram = new FilterProgram();
   filterProgram->program = program;
-  if (gl->caps->vertexArrayObjectSupport) {
+  if (gl->bindVertexArray != nullptr) {
     gl->genVertexArrays(1, &filterProgram->vertexArray);
   }
   gl->genBuffers(1, &filterProgram->vertexBuffer);
   return Resource::Wrap(context, filterProgram);
 }
 
-void FilterProgram::onRelease(Context* context) {
-  auto gl = GLContext::Unwrap(context);
+void FilterProgram::onReleaseGPU() {
+  auto gl = tgfx::GLFunctions::Get(context);
   if (program > 0) {
     gl->deleteProgram(program);
     program = 0;
@@ -157,10 +157,9 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(Effect* effect) {
   return std::unique_ptr<LayerFilter>(filter);
 }
 
-bool LayerFilter::initialize(Context* context) {
-  auto gl = GLContext::Unwrap(context);
+bool LayerFilter::initialize(tgfx::Context* context) {
   // 防止前面产生的GLError，导致后面CheckGLError逻辑返回错误结果
-  CheckGLError(gl);
+  CheckGLError(context);
 
   auto vertex = onBuildVertexShader();
   auto fragment = onBuildFragmentShader();
@@ -168,13 +167,14 @@ bool LayerFilter::initialize(Context* context) {
   if (filterProgram == nullptr) {
     return false;
   }
+  auto gl = tgfx::GLFunctions::Get(context);
   auto program = filterProgram->program;
   positionHandle = gl->getAttribLocation(program, "aPosition");
   textureCoordHandle = gl->getAttribLocation(program, "aTextureCoord");
   vertexMatrixHandle = gl->getUniformLocation(program, "uVertexMatrix");
   textureMatrixHandle = gl->getUniformLocation(program, "uTextureMatrix");
-  onPrepareProgram(gl, program);
-  if (!CheckGLError(gl)) {
+  onPrepareProgram(context, program);
+  if (!CheckGLError(context)) {
     filterProgram = nullptr;
     return false;
   }
@@ -189,73 +189,77 @@ std::string LayerFilter::onBuildFragmentShader() {
   return FRAGMENT_SHADER;
 }
 
-void LayerFilter::onPrepareProgram(const GLInterface*, unsigned) {
+void LayerFilter::onPrepareProgram(tgfx::Context*, unsigned) {
 }
 
-void LayerFilter::onUpdateParams(const GLInterface*, const Rect&, const Point&) {
+void LayerFilter::onUpdateParams(tgfx::Context*, const tgfx::Rect&, const tgfx::Point&) {
 }
 
-void LayerFilter::update(Frame frame, const Rect& inputBounds, const Rect& outputBounds,
-                         const Point& extraScale) {
+void LayerFilter::update(Frame frame, const tgfx::Rect& inputBounds, const tgfx::Rect& outputBounds,
+                         const tgfx::Point& extraScale) {
   layerFrame = frame;
   contentBounds = inputBounds;
   transformedBounds = outputBounds;
   filterScale = extraScale;
 }
 
-static void EnableMultisample(const GLInterface* gl, bool usesMSAA) {
-  if (usesMSAA && gl->caps->multisampleDisableSupport) {
-    gl->enable(GL::MULTISAMPLE);
+static void EnableMultisample(tgfx::Context* context, bool usesMSAA) {
+  if (usesMSAA && context->caps()->multisampleDisableSupport) {
+    auto gl = tgfx::GLFunctions::Get(context);
+    gl->enable(GL_MULTISAMPLE);
   }
 }
 
-static void DisableMultisample(const GLInterface* gl, bool usesMSAA) {
-  if (usesMSAA && gl->caps->multisampleDisableSupport) {
-    gl->disable(GL::MULTISAMPLE);
+static void DisableMultisample(tgfx::Context* context, bool usesMSAA) {
+  if (usesMSAA && context->caps()->multisampleDisableSupport) {
+    auto gl = tgfx::GLFunctions::Get(context);
+    gl->disable(GL_MULTISAMPLE);
   }
 }
 
-void LayerFilter::draw(Context* context, const FilterSource* source, const FilterTarget* target) {
+void LayerFilter::draw(tgfx::Context* context, const FilterSource* source,
+                       const FilterTarget* target) {
   if (source == nullptr || target == nullptr || !filterProgram) {
     LOGE(
         "LayerFilter::draw() can not draw filter, "
         "because the argument(source/target) is null");
     return;
   }
-  auto gl = GLContext::Unwrap(context);
-  EnableMultisample(gl, needsMSAA());
+  auto gl = tgfx::GLFunctions::Get(context);
+  EnableMultisample(context, needsMSAA());
   gl->useProgram(filterProgram->program);
-  gl->enable(GL::BLEND);
-  gl->blendEquation(GL::FUNC_ADD);
-  gl->blendFunc(GL::ONE, GL::ONE_MINUS_SRC_ALPHA);
-  gl->bindFramebuffer(GL::FRAMEBUFFER, target->frameBufferID);
+  gl->disable(GL_SCISSOR_TEST);
+  gl->enable(GL_BLEND);
+  gl->blendEquation(GL_FUNC_ADD);
+  gl->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, target->frameBuffer.id);
   gl->viewport(0, 0, target->width, target->height);
-
-  ActiveTexture(gl, GL::TEXTURE0, GL::TEXTURE_2D, source->textureID);
-  gl->uniformMatrix3fv(vertexMatrixHandle, 1, GL::FALSE, target->vertexMatrix.data());
-  gl->uniformMatrix3fv(textureMatrixHandle, 1, GL::FALSE, source->textureMatrix.data());
-  onUpdateParams(gl, contentBounds, filterScale);
+  ActiveGLTexture(context, 0, &source->sampler);
+  gl->uniformMatrix3fv(vertexMatrixHandle, 1, GL_FALSE, target->vertexMatrix.data());
+  gl->uniformMatrix3fv(textureMatrixHandle, 1, GL_FALSE, source->textureMatrix.data());
+  onUpdateParams(context, contentBounds, filterScale);
   auto vertices = computeVertices(contentBounds, transformedBounds, filterScale);
-  bindVertices(gl, source, target, vertices);
-  gl->drawArrays(GL::TRIANGLE_STRIP, 0, 4);
+  bindVertices(context, source, target, vertices);
+  gl->drawArrays(GL_TRIANGLE_STRIP, 0, 4);
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(0);
   }
-  DisableMultisample(gl, needsMSAA());
-  CheckGLError(gl);
+  DisableMultisample(context, needsMSAA());
+  CheckGLError(context);
 }
 
-std::vector<Point> LayerFilter::computeVertices(const Rect& bounds, const Rect& transformed,
-                                                const Point&) {
-  std::vector<Point> vertices = {};
-  Point contentPoint[4] = {{transformed.left, transformed.bottom},
-                           {transformed.right, transformed.bottom},
-                           {transformed.left, transformed.top},
-                           {transformed.right, transformed.top}};
-  Point texturePoints[4] = {{0.0f, bounds.height()},
-                            {bounds.width(), bounds.height()},
-                            {0.0f, 0.0f},
-                            {bounds.width(), 0.0f}};
+std::vector<tgfx::Point> LayerFilter::computeVertices(const tgfx::Rect& bounds,
+                                                      const tgfx::Rect& transformed,
+                                                      const tgfx::Point&) {
+  std::vector<tgfx::Point> vertices = {};
+  tgfx::Point contentPoint[4] = {{transformed.left, transformed.bottom},
+                                 {transformed.right, transformed.bottom},
+                                 {transformed.left, transformed.top},
+                                 {transformed.right, transformed.top}};
+  tgfx::Point texturePoints[4] = {{0.0f, bounds.height()},
+                                  {bounds.width(), bounds.height()},
+                                  {0.0f, 0.0f},
+                                  {bounds.width(), 0.0f}};
   for (int ii = 0; ii < 4; ii++) {
     vertices.push_back(contentPoint[ii]);
     vertices.push_back(texturePoints[ii]);
@@ -263,8 +267,8 @@ std::vector<Point> LayerFilter::computeVertices(const Rect& bounds, const Rect& 
   return vertices;
 }
 
-void LayerFilter::bindVertices(const GLInterface* gl, const FilterSource* source,
-                               const FilterTarget* target, const std::vector<Point>& points) {
+void LayerFilter::bindVertices(tgfx::Context* context, const FilterSource* source,
+                               const FilterTarget* target, const std::vector<tgfx::Point>& points) {
   std::vector<float> vertices = {};
   for (size_t i = 0; i < points.size();) {
     auto vertexPoint = ToGLVertexPoint(target, source, contentBounds, points[i++]);
@@ -274,20 +278,20 @@ void LayerFilter::bindVertices(const GLInterface* gl, const FilterSource* source
     vertices.push_back(texturePoint.x);
     vertices.push_back(texturePoint.y);
   }
-
+  auto gl = tgfx::GLFunctions::Get(context);
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(filterProgram->vertexArray);
   }
-  gl->bindBuffer(GL::ARRAY_BUFFER, filterProgram->vertexBuffer);
-  gl->bufferData(GL::ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL::STREAM_DRAW);
-  gl->vertexAttribPointer(static_cast<unsigned>(positionHandle), 2, GL::FLOAT, GL::FALSE,
+  gl->bindBuffer(GL_ARRAY_BUFFER, filterProgram->vertexBuffer);
+  gl->bufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STREAM_DRAW);
+  gl->vertexAttribPointer(static_cast<unsigned>(positionHandle), 2, GL_FLOAT, GL_FALSE,
                           4 * sizeof(float), static_cast<void*>(0));
   gl->enableVertexAttribArray(static_cast<unsigned>(positionHandle));
 
-  gl->vertexAttribPointer(textureCoordHandle, 2, GL::FLOAT, GL::FALSE, 4 * sizeof(float),
+  gl->vertexAttribPointer(textureCoordHandle, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
                           reinterpret_cast<void*>(2 * sizeof(float)));
   gl->enableVertexAttribArray(textureCoordHandle);
-  gl->bindBuffer(GL::ARRAY_BUFFER, 0);
+  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 bool LayerFilter::needsMSAA() const {

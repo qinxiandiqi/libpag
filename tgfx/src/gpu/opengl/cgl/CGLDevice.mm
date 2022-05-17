@@ -16,11 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/cgl/CGLDevice.h"
-#include "CGLProcGetter.h"
-#include "gpu/opengl/GLContext.h"
+#include "tgfx/gpu/opengl/cgl/CGLDevice.h"
 
-namespace pag {
+namespace tgfx {
 void* GLDevice::CurrentNativeHandle() {
   return CGLGetCurrentContext();
 }
@@ -139,4 +137,4 @@ void CGLDevice::onClearCurrent() {
   CGLSetCurrentContext(oldContext);
   CGLReleaseContext(oldContext);
 }
-}  // namespace pag
+}  // namespace tgfx

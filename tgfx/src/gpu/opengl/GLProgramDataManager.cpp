@@ -17,14 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLProgramDataManager.h"
-#include "GLContext.h"
-#include "GLInterface.h"
 #include "GLUniformHandler.h"
 #include "GLUtil.h"
 
-namespace pag {
-GLProgramDataManager::GLProgramDataManager(const GLInterface* gl, const std::vector<int>* uniforms)
-    : gl(gl), uniforms(uniforms) {
+namespace tgfx {
+GLProgramDataManager::GLProgramDataManager(Context* context, const std::vector<int>* uniforms)
+    : gl(GLFunctions::Get(context)), uniforms(uniforms) {
 }
 
 void GLProgramDataManager::set1f(UniformHandle handle, float v0) const {
@@ -41,6 +39,14 @@ void GLProgramDataManager::set2f(UniformHandle handle, float v0, float v1) const
   }
 }
 
+void GLProgramDataManager::set4f(UniformHandle handle, float v0, float v1, float v2,
+                                 float v3) const {
+  auto location = uniforms->at(handle.toIndex());
+  if (kUnusedUniform != location) {
+    gl->uniform4f(location, v0, v1, v2, v3);
+  }
+}
+
 void GLProgramDataManager::set4fv(UniformHandle handle, int arrayCount, const float* v) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
@@ -51,7 +57,7 @@ void GLProgramDataManager::set4fv(UniformHandle handle, int arrayCount, const fl
 void GLProgramDataManager::setMatrix3f(UniformHandle handle, const float matrix[]) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
-    gl->uniformMatrix3fv(location, 1, GL::FALSE, matrix);
+    gl->uniformMatrix3fv(location, 1, GL_FALSE, matrix);
   }
 }
 
@@ -59,4 +65,4 @@ void GLProgramDataManager::setMatrix(UniformHandle u, const Matrix& matrix) cons
   auto values = ToGLMatrix(matrix);
   setMatrix3f(u, &(values[0]));
 }
-}  // namespace pag
+}  // namespace tgfx

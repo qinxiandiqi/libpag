@@ -18,9 +18,10 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLAlphaFragmentProcessor : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -31,6 +32,6 @@ class GLAlphaFragmentProcessor : public GLFragmentProcessor {
 
   UniformHandle alphaUniform;
 
-  float alphaPrev = -1;
+  std::optional<float> alphaPrev;
 };
-}  // namespace pag
+}  // namespace tgfx

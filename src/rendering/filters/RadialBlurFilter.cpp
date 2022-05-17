@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RadialBlurFilter.h"
-#include "gpu/opengl/GLUtil.h"
 
 namespace pag {
 
@@ -62,19 +61,20 @@ std::string RadialBlurFilter::onBuildFragmentShader() {
   return RADIAL_BLUR_FRAGMENT_SHADER;
 }
 
-void RadialBlurFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void RadialBlurFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
+  auto gl = tgfx::GLFunctions::Get(context);
   amountHandle = gl->getUniformLocation(program, "uAmount");
   centerHandle = gl->getUniformLocation(program, "uCenter");
 }
 
-void RadialBlurFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                                      const Point&) {
+void RadialBlurFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
+                                      const tgfx::Point&) {
   auto* radialBlurEffect = reinterpret_cast<const RadialBlurEffect*>(effect);
   auto amount = radialBlurEffect->amount->getValueAt(layerFrame) * 0.00625;
   auto center = radialBlurEffect->center->getValueAt(layerFrame);
 
   amount = amount < 0.25 ? amount : 0.25;
-
+  auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform1f(amountHandle, amount);
   gl->uniform2f(centerHandle, (center.x - contentBounds.x()) / contentBounds.width(),
                 (center.y - contentBounds.y()) / contentBounds.height());

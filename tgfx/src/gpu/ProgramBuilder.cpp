@@ -21,9 +21,10 @@
 #include "GLGeometryProcessor.h"
 #include "GLXferProcessor.h"
 
-namespace pag {
-ProgramBuilder::ProgramBuilder(const GeometryProcessor* geometryProcessor, const Pipeline* pipeline)
-    : geometryProcessor(geometryProcessor), pipeline(pipeline) {
+namespace tgfx {
+ProgramBuilder::ProgramBuilder(Context* context, const GeometryProcessor* geometryProcessor,
+                               const Pipeline* pipeline)
+    : context(context), geometryProcessor(geometryProcessor), pipeline(pipeline) {
 }
 
 bool ProgramBuilder::emitAndInstallProcessors() {
@@ -57,9 +58,9 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
   glGeometryProcessor = geometryProcessor->createGLInstance();
 
   GLGeometryProcessor::FPCoordTransformHandler transformHandler(*pipeline, &transformedCoordVars);
-  GLGeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(),
-                                     varyingHandler(), uniformHandler(), caps(), geometryProcessor,
-                                     *outputColor, *outputCoverage, &transformHandler);
+  GLGeometryProcessor::EmitArgs args(
+      vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(), uniformHandler(),
+      getContext()->caps(), geometryProcessor, *outputColor, *outputCoverage, &transformHandler);
   glGeometryProcessor->emitCode(args);
 
   fragmentShaderBuilder()->codeAppend("}");
@@ -80,6 +81,14 @@ void ProgramBuilder::emitAndInstallFragProcessors(std::string* color, std::strin
     }
     **inOut = output;
   }
+}
+
+template <typename T>
+static const T* GetPointer(const std::vector<T>& vector, size_t atIndex) {
+  if (atIndex >= vector.size()) {
+    return nullptr;
+  }
+  return &vector[atIndex];
 }
 
 std::string ProgramBuilder::emitAndInstallFragProc(
@@ -105,9 +114,9 @@ std::string ProgramBuilder::emitAndInstallFragProc(
       texSamplers.emplace_back(emitSampler(sampler, name));
     }
   }
-  GLFragmentProcessor::TransformedCoordVars coords(processor,
-                                                   &transformedCoordVars[transformedCoordVarsIdx]);
-  GLFragmentProcessor::TextureSamplers textureSamplers(processor, &texSamplers[0]);
+  GLFragmentProcessor::TransformedCoordVars coords(
+      processor, GetPointer(transformedCoordVars, transformedCoordVarsIdx));
+  GLFragmentProcessor::TextureSamplers textureSamplers(processor, GetPointer(texSamplers, 0));
   GLFragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), processor, output,
                                      input, &coords, &textureSamplers);
 
@@ -199,4 +208,4 @@ void ProgramBuilder::finalizeShaders() {
   vertexShaderBuilder()->finalize(ShaderFlags::Vertex);
   fragmentShaderBuilder()->finalize(ShaderFlags::Fragment);
 }
-}  // namespace pag
+}  // namespace tgfx

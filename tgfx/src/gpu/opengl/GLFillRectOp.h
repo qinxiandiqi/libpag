@@ -22,15 +22,33 @@
 
 #include "GLBuffer.h"
 
-namespace pag {
+namespace tgfx {
 class GLFillRectOp : public GLDrawOp {
  public:
-  static std::unique_ptr<GLFillRectOp> Make();
+  static std::unique_ptr<GLFillRectOp> Make(const Rect& rect, const Matrix& viewMatrix);
+
+  static std::unique_ptr<GLFillRectOp> Make(const std::vector<Rect>& rects,
+                                            const std::vector<Matrix>& viewMatrices,
+                                            const std::vector<Matrix>& localMatrices,
+                                            const std::vector<Color>& colors);
 
   std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
 
   std::vector<float> vertices(const DrawArgs& args) override;
 
-  std::shared_ptr<GLBuffer> getIndexBuffer(const DrawArgs& args) override;
+  void draw(const DrawArgs& args) override;
+
+ private:
+  GLFillRectOp(std::vector<Rect> rects, std::vector<Matrix> viewMatrices,
+               std::vector<Matrix> localMatrices, std::vector<Color> colors);
+
+  std::vector<float> coverageVertices() const;
+
+  std::vector<float> noCoverageVertices() const;
+
+  std::vector<Rect> rects;
+  std::vector<Matrix> viewMatrices;
+  std::vector<Matrix> localMatrices;
+  std::vector<Color> colors;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -21,10 +21,10 @@
 #include "ResourceHandle.h"
 #include "ShaderVar.h"
 #include "Swizzle.h"
-#include "TextureSampler.h"
+#include "tgfx/gpu/TextureSampler.h"
 
-namespace pag {
-static constexpr char NO_MANGLE_PREFIX[] = "pag_";
+namespace tgfx {
+static constexpr char NO_MANGLE_PREFIX[] = "tgfx_";
 
 class ProgramBuilder;
 
@@ -66,4 +66,4 @@ class UniformHandler {
 
   friend class ProgramBuilder;
 };
-}  // namespace pag
+}  // namespace tgfx

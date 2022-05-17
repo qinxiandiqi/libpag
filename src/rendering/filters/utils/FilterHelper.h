@@ -18,22 +18,41 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
+#include "base/utils/Log.h"
+#include "base/utils/TGFXCast.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
+#include "tgfx/gpu/Texture.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {
-Matrix ToMatrix(const FilterTarget* target, bool flipY = false);
+std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int height,
+                                      tgfx::ImageOrigin origin);
 
-std::unique_ptr<FilterSource> ToFilterSource(const Texture* texture, const Point& scale);
+std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, int height,
+                                       tgfx::ImageOrigin origin);
 
-std::unique_ptr<FilterTarget> ToFilterTarget(const Surface* surface, const Matrix& drawingMatrix);
+tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY = false);
 
-Point ToGLTexturePoint(const FilterSource* source, const Point& texturePoint);
+std::unique_ptr<FilterSource> ToFilterSource(const tgfx::Texture* texture,
+                                             const tgfx::Point& scale);
 
-Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* source,
-                      const Rect& contentBounds, const Point& contentPoint);
+std::unique_ptr<FilterTarget> ToFilterTarget(const tgfx::Surface* surface,
+                                             const tgfx::Matrix& drawingMatrix);
 
-void PreConcatMatrix(FilterTarget* target, const Matrix& matrix);
+tgfx::Point ToGLTexturePoint(const FilterSource* source, const tgfx::Point& texturePoint);
+
+tgfx::Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* source,
+                            const tgfx::Rect& contentBounds, const tgfx::Point& contentPoint);
+
+void PreConcatMatrix(FilterTarget* target, const tgfx::Matrix& matrix);
+
+unsigned CreateGLProgram(tgfx::Context* context, const std::string& vertex,
+                         const std::string& fragment);
+
+void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::TextureSampler* sampler);
+
+bool CheckGLError(tgfx::Context* context);
+
 }  // namespace pag

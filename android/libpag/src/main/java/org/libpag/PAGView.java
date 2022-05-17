@@ -20,14 +20,14 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 
-import org.extra.tools.BroadcastUtil;
-import org.extra.tools.ScreenBroadcastReceiver;
+import org.extra.tools.Lifecycle;
+import org.extra.tools.LifecycleListener;
 
 import java.util.ArrayList;
 import java.util.List;
 
 
-public class PAGView extends TextureView implements TextureView.SurfaceTextureListener, ScreenBroadcastReceiver.ScreenStateListener {
+public class PAGView extends TextureView implements TextureView.SurfaceTextureListener, LifecycleListener {
 
     private final static String TAG = "PAGView";
     private SurfaceTextureListener mListener;
@@ -43,6 +43,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private boolean mSaveVisibleState;
     private SparseArray<PAGText> textReplacementMap = new SparseArray<>();
     private SparseArray<PAGImage> imageReplacementMap = new SparseArray<>();
+    private boolean isSync = false;
 
     private static final Object g_HandlerLock = new Object();
     private static PAGViewHandler g_PAGViewHandler = null;
@@ -92,6 +93,10 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     private static void NeedsUpdateView(PAGView pagView) {
+        if (pagView.isSync) {
+            pagView.updateView();
+            return;
+        }
         if (g_PAGViewHandler == null) {
             return;
         }
@@ -149,7 +154,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
                         needsUpdateViews.clear();
                     }
                     List<PAGView> flushedViews = new ArrayList<>();
-                    for (Object object: tempList) {
+                    for (Object object : tempList) {
                         if (!(object instanceof PAGView)) {
                             continue;
                         }
@@ -163,7 +168,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
                     break;
                 case MSG_SURFACE_DESTROY:
                     if (!(msg.obj instanceof SurfaceTexture)) {
-                       return;
+                        return;
                     }
                     SurfaceTexture surfaceTexture = (SurfaceTexture) msg.obj;
                     surfaceTexture.release();
@@ -207,7 +212,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     /**
      * PAG flush callback listener.
      * if add this listener, the PAG View onSurfaceTextureAvailable will send pag flush async, and this will make PAG View hasn't content until the async flush end.
-     *
      */
     public interface PAGFlushListener {
         /**
@@ -306,6 +310,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     };
 
     private void setupSurfaceTexture() {
+        Lifecycle.getInstance().addListener(this);
         setOpaque(false);
         pagPlayer = new PAGPlayer();
         setSurfaceTextureListener(this);
@@ -320,6 +325,15 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         }
         pagPlayer.setProgress(animatorProgress);
         flush();
+        PAGView.this.post(new Runnable() {
+            @Override
+            public void run() {
+                boolean opaque = PAGView.this.isOpaque();
+                // In order to call updateLayerAndInvalidate to update the TextureView.
+                PAGView.this.setOpaque(!opaque);
+                PAGView.this.setOpaque(opaque);
+            }
+        });
         if (!mPAGFlushListeners.isEmpty()) {
             PAGView.this.post(new Runnable() {
                 @Override
@@ -406,7 +420,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         isAttachedToWindow = true;
         super.onAttachedToWindow();
         animator.addListener(mAnimatorListenerAdapter);
-        BroadcastUtil.getInstance().registerScreenBroadcast(this);
         synchronized (g_HandlerLock) {
             StartHandlerThread();
         }
@@ -417,7 +430,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     protected void onDetachedFromWindow() {
         isAttachedToWindow = false;
         super.onDetachedFromWindow();
-        BroadcastUtil.getInstance().unregisterScreenBroadcast(this);
         if (pagSurface != null) {
             // 延迟释放 pagSurface，否则Android 4.4 及之前版本会在 onDetachedFromWindow() 时 Crash。https://www.jianshu.com/p/675455c225bd
             pagSurface.release();
@@ -467,6 +479,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     };
 
     private void doPlay() {
+        pagPlayer.prepare();
         if (!isAttachedToWindow) {
             Log.e(TAG, "doPlay: PAGView is not attached to window");
             return;
@@ -515,7 +528,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
-     * Set the number of times the animation will repeat. The default is 1, which means the animation
+     * Sets the number of times the animation will repeat. The default is 1, which means the animation
      * will play only once. 0 means the animation will play infinity times.
      */
     public void setRepeatCount(int value) {
@@ -581,7 +594,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
-     * Load a pag file from the specified path, returns false if the file does not exist or the data is not a pag file.
+     * Loads a pag file from the specified path, returns false if the file does not exist or the data is not a pag file.
      * The path starts with "assets://" means that it is located in assets directory.
      * Note: All PAGFiles loaded by the same path share the same internal cache. The internal cache is alive until all
      * PAGFiles are released. Use 'PAGFile.Load(byte[])' instead if you don't want to load a PAGFile from the intenal caches.
@@ -625,7 +638,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
-     * Set the value of videoEnabled property.
+     * Sets the value of videoEnabled property.
      */
     public void setVideoEnabled(boolean enable) {
         pagPlayer.setVideoEnabled(enable);
@@ -642,7 +655,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
-     * Set the value of cacheEnabled property.
+     * Sets the value of cacheEnabled property.
      */
     public void setCacheEnabled(boolean value) {
         pagPlayer.setCacheEnabled(value);
@@ -658,7 +671,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
-     * Set the value of cacheScale property.
+     * Sets the value of cacheScale property.
      */
     public void setCacheScale(float value) {
         pagPlayer.setCacheScale(value);
@@ -674,7 +687,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
-     * Set the maximum frame rate for rendering.
+     * Sets the maximum frame rate for rendering.
      */
     public void setMaxFrameRate(float value) {
         pagPlayer.setMaxFrameRate(value);
@@ -703,7 +716,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
-     * Set the transformation which will be applied to the composition. The scaleMode property
+     * Sets the transformation which will be applied to the composition. The scaleMode property
      * will be set to PAGScaleMode::None when this method is called.
      */
     public void setMatrix(Matrix matrix) {
@@ -725,12 +738,27 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
-     * Set the progress of play position, the valid value is from 0.0 to 1.0.
+     * Sets the progress of play position, the valid value is from 0.0 to 1.0.
      */
     public void setProgress(double value) {
         value = Math.max(0, Math.min(value, 1));
         currentPlayTime = (long) (value * animator.getDuration());
         animator.setCurrentPlayTime(currentPlayTime);
+        onAnimationUpdate(value);
+    }
+
+    /**
+     * Returns true if PAGView is playing in the main thread. The default value is false.
+     */
+    public boolean isSync() {
+        return isSync;
+    }
+
+    /**
+     * Sets the sync flag for the PAGView.
+     */
+    public void setSync(boolean isSync) {
+        this.isSync = isSync;
     }
 
     /**
@@ -759,24 +787,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     @Override
-    public void onScreenOff() {
-        if (this.getVisibility() == View.VISIBLE) {
-            this.mSaveVisibleState = true;
-            // workaround 在有些手机上，如果不置成不可见，解锁以后画面会不可见
-            // 在VIVO IQOO Pro表现为必现的不可见，在一加6t上表现为偶现不可见
-            setVisibility(View.INVISIBLE);
-        }
-    }
-
-    @Override
-    public void onScreenOn() {
-        if (this.mSaveVisibleState) {
-            this.setVisibility(View.VISIBLE);
-        }
-        this.mSaveVisibleState = false;
-    }
-
-    @Override
     public void setBackgroundDrawable(Drawable background) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N && background != null) {
             super.setBackgroundDrawable(background);
@@ -784,6 +794,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     private boolean preAggregatedVisible = true;
+
     @Override
     public void onVisibilityAggregated(boolean isVisible) {
         super.onVisibilityAggregated(isVisible);
@@ -796,6 +807,16 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             resumeAnimator();
         } else {
             pauseAnimator();
+        }
+    }
+
+    @Override
+    public void onResume() {
+        // When the device is locked and then unlocked, the PAGView's content may disappear,
+        // use the following way to make the content appear.
+        if (isAttachedToWindow && getVisibility() == View.VISIBLE) {
+            setVisibility(View.INVISIBLE);
+            setVisibility(View.VISIBLE);
         }
     }
 
@@ -816,9 +837,5 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         }
         _isAnimatorPreRunning = null;
         doPlay();
-    }
-
-    static {
-        BroadcastUtil.getInstance().registerScreenBroadcast();
     }
 }

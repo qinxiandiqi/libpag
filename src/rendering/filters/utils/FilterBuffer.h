@@ -18,48 +18,43 @@
 
 #pragma once
 
-#include "gpu/opengl/GLRenderTarget.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace pag {
 class FilterBuffer {
  public:
-  static std::shared_ptr<FilterBuffer> Make(Context* context, int width, int height,
+  static std::shared_ptr<FilterBuffer> Make(tgfx::Context* context, int width, int height,
                                             bool usesMSAA = false);
 
-  void clearColor(const GLInterface* gl) const;
+  void clearColor() const;
 
-  std::unique_ptr<FilterSource> toFilterSource(const Point& scale) const;
+  std::unique_ptr<FilterSource> toFilterSource(const tgfx::Point& scale) const;
 
-  std::unique_ptr<FilterTarget> toFilterTarget(const Matrix& drawingMatrix) const;
+  std::unique_ptr<FilterTarget> toFilterTarget(const tgfx::Matrix& drawingMatrix) const;
 
   int width() const {
-    return renderTarget->width();
+    return surface->width();
   }
 
   int height() const {
-    return renderTarget->height();
+    return surface->height();
   }
 
   bool usesMSAA() const {
-    return renderTarget->usesMSAA();
+    return surface->getRenderTarget()->sampleCount() > 1;
   }
 
-  GLFrameBufferInfo getFramebuffer() const {
-    return renderTarget->getGLInfo();
-  }
+  tgfx::GLFrameBuffer getFramebuffer() const;
 
-  GLTextureInfo getTexture() const {
-    return texture->getGLInfo();
-  }
-
-  void resolve(Context* context);
+  tgfx::GLSampler getTexture() const;
 
  private:
-  std::shared_ptr<GLRenderTarget> renderTarget = nullptr;
-  std::shared_ptr<GLTexture> texture = nullptr;
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
+
   FilterBuffer() = default;
 };
 }  // namespace pag

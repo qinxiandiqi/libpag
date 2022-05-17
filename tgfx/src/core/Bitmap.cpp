@@ -16,12 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Bitmap.h"
-#include "core/Image.h"
-#include "platform/Platform.h"
+#include "tgfx/core/Bitmap.h"
 #include "skcms.h"
+#include "tgfx/core/Image.h"
 
-namespace pag {
+namespace tgfx {
 
 static inline void* AddOffset(void* pixels, size_t offset) {
   return reinterpret_cast<uint8_t*>(pixels) + offset;
@@ -168,8 +167,9 @@ bool Bitmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int
     return false;
   }
   auto srcPixels = _info.computeOffset(_pixels, srcX, srcY);
+  auto srcInfo = _info.makeWH(imageInfo.width(), imageInfo.height());
   dstPixels = imageInfo.computeOffset(dstPixels, -srcX, -srcY);
-  ConvertPixels(_info, srcPixels, imageInfo, dstPixels);
+  ConvertPixels(srcInfo, srcPixels, imageInfo, dstPixels);
   return true;
 }
 
@@ -181,9 +181,10 @@ bool Bitmap::writePixels(const ImageInfo& srcInfo, const void* srcPixels, int ds
   if (imageInfo.isEmpty()) {
     return false;
   }
-  auto dstPixels = _info.computeOffset(_writablePixels, dstX, dstY);
   srcPixels = imageInfo.computeOffset(srcPixels, -dstX, -dstY);
-  ConvertPixels(imageInfo, srcPixels, _info, dstPixels);
+  auto dstPixels = _info.computeOffset(_writablePixels, dstX, dstY);
+  auto dstInfo = _info.makeWH(imageInfo.width(), imageInfo.height());
+  ConvertPixels(imageInfo, srcPixels, dstInfo, dstPixels);
   return true;
 }
 
@@ -196,17 +197,12 @@ bool Bitmap::eraseAll() {
   } else {
     auto rowCount = _info.height();
     auto trimRowBytes = _info.width() * _info.bytesPerPixel();
+    auto* pixels = static_cast<char*>(_writablePixels);
     for (int i = 0; i < rowCount; i++) {
-      memset(_writablePixels, 0, trimRowBytes);
+      memset(pixels, 0, trimRowBytes);
+      pixels += info().rowBytes();
     }
   }
   return true;
 }
-
-void Trace(const Bitmap& bitmap, const std::string& tag) {
-  if (bitmap.isEmpty()) {
-    return;
-  }
-  Platform::Current()->traceImage(bitmap.info(), bitmap.pixels(), tag);
-}
-}  // namespace pag
+}  // namespace tgfx

@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Window.h"
-#include "base/utils/Log.h"
-#include "gpu/Device.h"
+#include "tgfx/gpu/Window.h"
+#include "core/utils/Log.h"
+#include "tgfx/gpu/Device.h"
 
-namespace pag {
+namespace tgfx {
 Window::Window(std::shared_ptr<Device> device) : device(std::move(device)) {
 }
 
@@ -48,4 +48,4 @@ bool Window::checkContext(Context* context) {
   }
   return true;
 }
-}  // namespace pag
+}  // namespace tgfx

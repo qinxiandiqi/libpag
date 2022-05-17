@@ -23,7 +23,7 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
-__attribute__((visibility("default"))) @interface PAGSurface : NSObject
+PAG_API @interface PAGSurface : NSObject
 
 + (PAGSurface*)FromView:(NSView*)view;
 
@@ -60,4 +60,9 @@ __attribute__((visibility("default"))) @interface PAGSurface : NSObject
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 
+/**
+ * Returns a CVPixelBuffer object capturing the contents of the PAGSurface. Subsequent rendering of
+ * the PAGSurface will not be captured.
+ */
+- (CVPixelBufferRef)makeSnapshot;
 @end

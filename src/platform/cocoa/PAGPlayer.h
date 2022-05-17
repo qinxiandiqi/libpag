@@ -23,7 +23,7 @@
 #import "PAGScaleMode.h"
 #import "PAGSurface.h"
 
-__attribute__((visibility("default"))) @interface PAGPlayer : NSObject
+PAG_API @interface PAGPlayer : NSObject
 /**
  * Returns the current PAGComposition for PAGPlayer to render as content.
  */
@@ -129,6 +129,13 @@ __attribute__((visibility("default"))) @interface PAGPlayer : NSObject
  * Set the progress of play position, the value is from 0.0 to 1.0.
  */
 - (void)setProgress:(double)value;
+
+/**
+ * Prepares the player for the next flush() call. It collects all CPU tasks from the current
+ * progress of the composition and runs them asynchronously in parallel. It is usually used for
+ * speeding up the first frame rendering.
+ */
+- (void)prepare;
 
 /**
  * Apply all pending changes to the target surface immediately. Returns true if the content has

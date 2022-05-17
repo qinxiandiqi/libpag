@@ -16,13 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Image.h"
-#include "base/utils/USE.h"
-#include "core/Bitmap.h"
-#include "core/ImageInfo.h"
-#include "core/PixelBuffer.h"
-#include "core/Stream.h"
+#include "tgfx/core/Image.h"
+#include "core/utils/USE.h"
 #include "platform/NativeCodec.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/PixelBuffer.h"
+#include "tgfx/core/Stream.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
 #include "core/images/webp/WebpImage.h"
@@ -38,19 +39,18 @@
 #include "core/images/jpeg/JpegImage.h"
 #endif
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<Image> Image::MakeFrom(const std::string& filePath) {
   std::shared_ptr<Image> image = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
   if (stream == nullptr || stream->size() <= 14) {
     return nullptr;
   }
-  auto buffer = new uint8_t[14];
-  if (stream->read(buffer, 14) < 14) {
-    delete[] buffer;
+  Buffer buffer(14);
+  if (stream->read(buffer.data(), 14) < 14) {
     return nullptr;
   }
-  auto data = Data::MakeAdopted(buffer, 14, Data::DeleteProc);
+  auto data = buffer.release();
 #ifdef TGFX_USE_WEBP_DECODE
   if (WebpImage::IsWebp(data)) {
     image = WebpImage::MakeFrom(filePath);
@@ -106,6 +106,13 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Data> imageBytes) {
   return image;
 }
 
+std::shared_ptr<Image> Image::MakeFrom(void* nativeImage) {
+  if (nativeImage == nullptr) {
+    return nullptr;
+  }
+  return NativeCodec::MakeFrom(nativeImage);
+}
+
 std::shared_ptr<Data> Image::Encode(const ImageInfo& info, const void* pixels, EncodedFormat format,
                                     int quality) {
   if (info.isEmpty() || pixels == nullptr) {
@@ -141,4 +148,4 @@ std::shared_ptr<TextureBuffer> Image::makeBuffer() const {
   auto result = readPixels(pixelBuffer->info(), bitmap.writablePixels());
   return result ? pixelBuffer : nullptr;
 }
-}  // namespace pag
+}  // namespace tgfx

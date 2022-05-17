@@ -19,9 +19,9 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "gpu/TextureBuffer.h"
+#include "tgfx/gpu/TextureBuffer.h"
 
-namespace pag {
+namespace tgfx {
 class NativeTextureBuffer : public TextureBuffer {
  public:
   static std::shared_ptr<NativeTextureBuffer> Make(int width, int height, emscripten::val source);
@@ -35,4 +35,4 @@ class NativeTextureBuffer : public TextureBuffer {
 
   emscripten::val source = emscripten::val::null();
 };
-}  // namespace pag
+}  // namespace tgfx

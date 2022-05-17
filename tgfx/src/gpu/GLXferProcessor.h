@@ -20,11 +20,11 @@
 
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/ProgramDataManager.h"
-#include "gpu/Texture.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/XferProcessor.h"
+#include "tgfx/gpu/Texture.h"
 
-namespace pag {
+namespace tgfx {
 class GLXferProcessor {
  public:
   virtual ~GLXferProcessor() = default;
@@ -63,4 +63,4 @@ class GLXferProcessor {
                        const Point&) {
   }
 };
-}  // namespace pag
+}  // namespace tgfx

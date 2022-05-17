@@ -18,9 +18,10 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * The 7 threshold positions that define the boundaries of the 8 intervals (excluding t = 0, and t =
  * 1) are packed into two vec4's instead of having up to 7 separate scalar uniforms. For low
@@ -61,25 +62,23 @@ class GLUnrolledBinaryGradientColorizer : public GLFragmentProcessor {
   UniformHandle thresholds1_7Uniform;
   UniformHandle thresholds9_13Uniform;
 
-  Color4f scale0_1Prev = Color4f::Invalid();
-  Color4f scale2_3Prev = Color4f::Invalid();
-  Color4f scale4_5Prev = Color4f::Invalid();
-  Color4f scale6_7Prev = Color4f::Invalid();
-  Color4f scale8_9Prev = Color4f::Invalid();
-  Color4f scale10_11Prev = Color4f::Invalid();
-  Color4f scale12_13Prev = Color4f::Invalid();
-  Color4f scale14_15Prev = Color4f::Invalid();
-  Color4f bias0_1Prev = Color4f::Invalid();
-  Color4f bias2_3Prev = Color4f::Invalid();
-  Color4f bias4_5Prev = Color4f::Invalid();
-  Color4f bias6_7Prev = Color4f::Invalid();
-  Color4f bias8_9Prev = Color4f::Invalid();
-  Color4f bias10_11Prev = Color4f::Invalid();
-  Color4f bias12_13Prev = Color4f::Invalid();
-  Color4f bias14_15Prev = Color4f::Invalid();
-  Rect thresholds1_7Prev =
-      Rect::MakeWH(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
-  Rect thresholds9_13Prev =
-      Rect::MakeWH(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+  std::optional<Color> scale0_1Prev;
+  std::optional<Color> scale2_3Prev;
+  std::optional<Color> scale4_5Prev;
+  std::optional<Color> scale6_7Prev;
+  std::optional<Color> scale8_9Prev;
+  std::optional<Color> scale10_11Prev;
+  std::optional<Color> scale12_13Prev;
+  std::optional<Color> scale14_15Prev;
+  std::optional<Color> bias0_1Prev;
+  std::optional<Color> bias2_3Prev;
+  std::optional<Color> bias4_5Prev;
+  std::optional<Color> bias6_7Prev;
+  std::optional<Color> bias8_9Prev;
+  std::optional<Color> bias10_11Prev;
+  std::optional<Color> bias12_13Prev;
+  std::optional<Color> bias14_15Prev;
+  std::optional<Rect> thresholds1_7Prev;
+  std::optional<Rect> thresholds9_13Prev;
 };
-}  // namespace pag
+}  // namespace tgfx

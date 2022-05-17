@@ -19,11 +19,13 @@
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/opengl/GLCaps.h"
-#include "gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLUtil.h"
 #include "rendering/Drawable.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
+using namespace tgfx;
+
 PAG_TEST_SUIT(PAGSurfaceTest)
 
 /**
@@ -36,18 +38,19 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLContext::Unwrap(context);
-  auto glVersion = gl->caps->version;
-  GLTextureInfo textureInfo;
-  CreateTexture(gl, width, height, &textureInfo);
-  auto backendTexture = BackendTexture(textureInfo, width, height);
+
+  auto glVersion = GLCaps::Get(context)->version;
+  tgfx::GLSampler textureInfo;
+  CreateGLTexture(context, width, height, &textureInfo);
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
   auto nativeHandle = GLDevice::CurrentNativeHandle();
   device->unlock();
   auto glDevice = std::static_pointer_cast<GLDevice>(pagSurface->drawable->getDevice());
   EXPECT_TRUE(glDevice->sharableWith(nativeHandle));
 
-  auto drawable = std::make_shared<TextureDrawable>(device, backendTexture, ImageOrigin::TopLeft);
+  auto drawable =
+      std::make_shared<TextureDrawable>(device, backendTexture, tgfx::ImageOrigin::TopLeft);
   auto pagSurface2 = PAGSurface::MakeFrom(drawable);
   auto pagPlayer2 = std::make_shared<PAGPlayer>();
   pagPlayer2->setSurface(pagSurface2);
@@ -88,10 +91,9 @@ PAG_TEST(PAGSurfaceTest, Mask) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLContext::Unwrap(context);
-  GLTextureInfo textureInfo;
-  CreateTexture(gl, width, height, &textureInfo);
-  auto backendTexture = BackendTexture(textureInfo, width, height);
+  tgfx::GLSampler textureInfo;
+  CreateGLTexture(context, width, height, &textureInfo);
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
   device->unlock();
 
@@ -105,7 +107,38 @@ PAG_TEST(PAGSurfaceTest, Mask) {
 
   context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  gl = GLContext::Unwrap(context);
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
+  device->unlock();
+}
+
+/**
+ * 用例描述: PAGSurface 的 origin 是 BottomLeft 时 scissor rect 需要 flip Y。
+ */
+PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
+  auto pagFile = PAGFile::Load("../assets/test.pag");
+  auto width = pagFile->width();
+  auto height = pagFile->height() * 2;
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  tgfx::GLSampler textureInfo;
+  CreateGLTexture(context, width, height, &textureInfo);
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
+  device->unlock();
+
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setMatrix(pag::Matrix::MakeTrans(0, static_cast<float>(pagFile->height())));
+  pagPlayer->setProgress(0.5);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSurfaceTest/BottomLeftScissor"));
+
+  context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
 }

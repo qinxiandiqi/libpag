@@ -19,10 +19,10 @@
 #pragma once
 
 #include "CGTypeface.h"
-#include "core/ImageInfo.h"
-#include "core/PixelBuffer.h"
+#include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/PixelBuffer.h"
 
-namespace pag {
+namespace tgfx {
 class CGScalerContextRec {
  public:
   float textSize = 12.f;
@@ -36,6 +36,7 @@ class CGScalerContext {
   static std::unique_ptr<CGScalerContext> Make(std::shared_ptr<Typeface> typeface, float size,
                                                bool fauxBold = false, bool fauxItalic = false,
                                                bool verticalText = false);
+  ~CGScalerContext();
 
   FontMetrics generateFontMetrics();
 
@@ -55,4 +56,4 @@ class CGScalerContext {
   CTFontRef ctFont = nullptr;
   CGAffineTransform transform = CGAffineTransformIdentity;
 };
-}  // namespace pag
+}  // namespace tgfx

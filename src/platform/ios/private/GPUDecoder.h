@@ -22,12 +22,12 @@
 #include <VideoToolbox/VideoToolbox.h>
 #include <list>
 #include <unordered_map>
-#include "video/VideoDecoder.h"
+#include "rendering/video/VideoDecoder.h"
 
 namespace pag {
 class GPUDecoder : public VideoDecoder {
  public:
-  explicit GPUDecoder(const VideoConfig& config);
+  explicit GPUDecoder(const VideoFormat& format);
 
   ~GPUDecoder() override;
 
@@ -48,11 +48,11 @@ class GPUDecoder : public VideoDecoder {
  private:
   VTDecompressionSessionRef session = nullptr;
   CMFormatDescriptionRef videoFormatDescription = nullptr;
-  YUVColorSpace sourceColorSpace = YUVColorSpace::Rec601;
-  YUVColorSpace destinationColorSpace = YUVColorSpace::Rec601;
-  YUVColorRange colorRange = YUVColorRange::MPEG;
+  tgfx::YUVColorSpace sourceColorSpace = tgfx::YUVColorSpace::Rec601;
+  tgfx::YUVColorSpace destinationColorSpace = tgfx::YUVColorSpace::Rec601;
+  tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
 
-  bool initVideoToolBox(const std::vector<std::shared_ptr<ByteData>>& headers,
+  bool initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
                         const std::string& mimeType);
   bool resetVideoToolBox();
   void cleanResources();

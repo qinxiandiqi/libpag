@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/qt/QGLDevice.h"
+#include "tgfx/gpu/opengl/qt/QGLDevice.h"
 #include <QApplication>
 #include <QThread>
 #include "QGLProcGetter.h"
-#include "base/utils/Log.h"
+#include "core/utils/Log.h"
 
-namespace pag {
+namespace tgfx {
 void* GLDevice::CurrentNativeHandle() {
   return QOpenGLContext::currentContext();
 }
@@ -152,4 +152,4 @@ void QGLDevice::onClearCurrent() {
     oldSurface = nullptr;
   }
 }
-}  // namespace pag
+}  // namespace tgfx

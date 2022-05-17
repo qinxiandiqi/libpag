@@ -20,11 +20,9 @@
 #include <algorithm>
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TimeUtil.h"
-#include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/editing/ImageReplacement.h"
 #include "rendering/editing/PAGImageHolder.h"
-#include "rendering/readers/SequenceReader.h"
 #include "rendering/renderers/CompositionRenderer.h"
 #include "rendering/utils/LockGuard.h"
 
@@ -69,11 +67,8 @@ uint32_t PAGStage::getContentVersion() const {
   return contentVersion;
 }
 
-std::shared_ptr<File> PAGStage::getSequenceFile(Sequence* sequence) {
-  if (sequence == nullptr) {
-    return nullptr;
-  }
-  auto result = layerReferenceMap.find(sequence->composition->uniqueID);
+std::shared_ptr<File> PAGStage::getFileFromReferenceMap(ID uniqueID) {
+  auto result = layerReferenceMap.find(uniqueID);
   if (result == layerReferenceMap.end()) {
     return nullptr;
   }
@@ -328,8 +323,8 @@ float PAGStage::calcMaxScaleFactor(ID referenceID) {
   return maxScaleFactor;
 }
 
-Point PAGStage::GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGImage) {
-  Point scale = {1, 1};
+tgfx::Point PAGStage::GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGImage) {
+  tgfx::Point scale = {1, 1};
   if (pagLayer->layerType() == LayerType::Image) {
     if (isPAGImage) {
       scale = static_cast<PAGImageLayer*>(pagLayer)->replacement->getScaleFactor();
@@ -350,13 +345,13 @@ Point PAGStage::GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGImage) 
   return scale;
 }
 
-float PAGStage::getLayerScaleFactor(PAGLayer* pagLayer, Point scale) {
+float PAGStage::getLayerScaleFactor(PAGLayer* pagLayer, tgfx::Point scale) {
   auto parent = pagLayer;
   while (parent) {
     auto layerScaleFactor = parent->layerCache->getMaxScaleFactor();
     scale.x *= fabs(layerScaleFactor.x);
     scale.y *= fabs(layerScaleFactor.y);
-    auto matrixScaleFactor = GetScaleFactor(parent->layerMatrix);
+    auto matrixScaleFactor = GetScaleFactor(ToTGFX(parent->layerMatrix));
     scale.x *= fabs(matrixScaleFactor.x);
     scale.y *= fabs(matrixScaleFactor.y);
     if (parent->_parent) {

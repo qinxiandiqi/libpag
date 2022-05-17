@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PathRef.h"
-#include "core/Path.h"
+#include "tgfx/core/Path.h"
 
-namespace pag {
+namespace tgfx {
 using namespace pk;
 
 const SkPath& PathRef::ReadAccess(const Path& path) {
@@ -29,4 +29,4 @@ const SkPath& PathRef::ReadAccess(const Path& path) {
 SkPath& PathRef::WriteAccess(Path& path) {
   return path.writableRef()->path;
 }
-}  // namespace pag
+}  // namespace tgfx

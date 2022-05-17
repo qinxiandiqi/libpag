@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlowBlurFilter.h"
-#include "gpu/opengl/GLUtil.h"
 
 namespace pag {
 static const char GLOW_BLUR_VERTEX_SHADER[] = R"(
@@ -72,7 +71,8 @@ std::string GlowBlurFilter::onBuildFragmentShader() {
   return GLOW_BLUR_FRAGMENT_SHADER;
 }
 
-void GlowBlurFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void GlowBlurFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
+  auto gl = tgfx::GLFunctions::Get(context);
   textureOffsetHHandle = gl->getUniformLocation(program, "textureOffsetH");
   textureOffsetVHandle = gl->getUniformLocation(program, "textureOffsetV");
 }
@@ -81,9 +81,10 @@ void GlowBlurFilter::updateOffset(float offset) {
   blurOffset = offset;
 }
 
-void GlowBlurFilter::onUpdateParams(const GLInterface* gl, const Rect&, const Point&) {
+void GlowBlurFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&, const tgfx::Point&) {
   auto textureOffsetH = blurDirection == BlurDirection::Horizontal ? blurOffset : 0;
   auto textureOffsetV = blurDirection == BlurDirection::Vertical ? blurOffset : 0;
+  auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform1f(textureOffsetHHandle, textureOffsetH);
   gl->uniform1f(textureOffsetVHandle, textureOffsetV);
 }

@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Stream.h"
+#include "tgfx/core/Stream.h"
 
-namespace pag {
+namespace tgfx {
 
 class FileStream : public Stream {
  public:
@@ -69,4 +69,4 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   return std::make_unique<FileStream>(file, length);
 }
 
-}  // namespace pag
+}  // namespace tgfx

@@ -24,19 +24,25 @@
 #include "pag/gpu.h"
 #include "pag/types.h"
 
+namespace tgfx {
+struct Rect;
+class Context;
+class Surface;
+}  // namespace tgfx
+
 namespace pag {
 class Recorder;
 
-class Path;
-
 class RenderCache;
+
+class Drawable;
 
 class Content {
  public:
   virtual ~Content() = default;
 
  protected:
-  virtual void measureBounds(Rect* bounds) = 0;
+  virtual void measureBounds(tgfx::Rect* bounds) = 0;
 
   virtual void draw(Recorder* recorder) = 0;
 
@@ -57,12 +63,12 @@ class Content {
   friend class PAGTextLayer;
 };
 
-class Image;
+class Graphic;
 
 /**
- * A still image used to replace the image contents in a PAGFile.
+ * An image used to replace the contents of PAGImageLayers in a PAGFile.
  */
-class PAG_API PAGImage : public Content {
+class PAG_API PAGImage {
  public:
   /**
    * Creates a PAGImage object from a path of a image file, return null if the file does not exist
@@ -95,25 +101,33 @@ class PAG_API PAGImage : public Content {
    */
   static std::shared_ptr<PAGImage> FromTexture(const BackendTexture& texture, ImageOrigin origin);
 
+  virtual ~PAGImage() = default;
+
   /**
    * Returns a globally unique id for this object.
    */
-  ID uniqueID() const;
+  ID uniqueID() const {
+    return _uniqueID;
+  }
 
   /**
    * Returns the width in pixels.
    */
-  int width();
+  int width() const {
+    return _width;
+  }
 
   /**
    * Returns the height in pixels.
    */
-  int height();
+  int height() const {
+    return _height;
+  }
 
   /**
    * Returns the current scale mode. The default value is PAGScaleMode::LetterBox.
    */
-  int scaleMode();
+  int scaleMode() const;
 
   /**
    * Specifies the rule of how to scale the content to fit the image layer's original size.
@@ -124,7 +138,7 @@ class PAG_API PAGImage : public Content {
   /**
    * Returns a copy of current matrix.
    */
-  Matrix matrix();
+  Matrix matrix() const;
 
   /**
    * Set the transformation which will be applied to the content.
@@ -133,20 +147,22 @@ class PAG_API PAGImage : public Content {
   void setMatrix(const Matrix& matrix);
 
  protected:
-  PAGImage();
+  PAGImage(int width, int height);
 
-  virtual Rect getContentSize() const = 0;
+  virtual std::shared_ptr<Graphic> getGraphic() = 0;
 
-  virtual std::shared_ptr<Image> getImage() const {
-    return nullptr;
-  }
+  virtual bool isStill() const = 0;
+
+  virtual bool setContentTime(int64_t time) = 0;
 
  private:
-  std::mutex locker = {};
+  mutable std::mutex locker = {};
   ID _uniqueID = 0;
+  int _width = 0;
+  int _height = 0;
+  int _scaleMode = PAGScaleMode::LetterBox;
   Matrix _matrix = Matrix::I();
   bool hasSetScaleMode = false;
-  int _scaleMode = PAGScaleMode::LetterBox;
 
   Matrix getContentMatrix(int defaultScaleMode, int contentWidth, int contentHeight);
 
@@ -158,7 +174,7 @@ class PAG_API PAGImage : public Content {
 
   friend class RenderCache;
 
-  friend class PAGImageHolder;
+  friend class AudioClip;
 };
 
 class PAGComposition;
@@ -426,7 +442,7 @@ class PAG_API PAGLayer : public Content {
   Frame globalToLocalFrame(Frame globalFrame) const;
   Point globalToLocalPoint(float stageX, float stageY);
   void draw(Recorder* recorder) override;
-  void measureBounds(Rect* bounds) override;
+  void measureBounds(tgfx::Rect* bounds) override;
   Matrix getTotalMatrixInternal();
   virtual void setMatrixInternal(const Matrix& matrix);
   virtual float frameRateInternal() const;
@@ -597,16 +613,13 @@ class PAG_API PAGTextLayer : public PAGLayer {
    */
   void setText(const std::string& text);
 
-  // internal methods start here :
-
-  void replaceTextInternal(std::shared_ptr<TextDocument> textData);
-
   /**
    * Reset the text layer to its default text data.
    */
   void reset();
 
  protected:
+  void replaceTextInternal(std::shared_ptr<TextDocument> textData);
   void setMatrixInternal(const Matrix& matrix) override;
   Content* getContent() override;
   bool contentModified() const override;
@@ -619,6 +632,8 @@ class PAG_API PAGTextLayer : public PAGLayer {
   const TextDocument* textDocumentForRead() const;
 
   TextDocument* textDocumentForWrite();
+
+  friend class PAGFile;
 
   friend class TextReplacement;
 };
@@ -726,7 +741,13 @@ class PAG_API PAGImageLayer : public PAGLayer {
    */
   int64_t contentTimeToLayer(int64_t contentTime);
 
+  /**
+   * The default image data of this layer, which is webp format.
+   */
+  ByteData* imageBytes() const;
+
  protected:
+  bool gotoTime(int64_t layerTime) override;
   void replaceImageInternal(std::shared_ptr<PAGImage> image);
   int64_t getCurrentContentTime(int64_t layerTime);
   Property<float>* getContentTimeRemap();
@@ -758,13 +779,15 @@ class PAG_API PAGImageLayer : public PAGLayer {
   static Frame ScaleTimeRemap(AnimatableProperty<float>* property, const TimeRange& visibleRange,
                               double frameScale, Frame fileEndFrame);
   Frame getFrameFromTimeRemap(Frame value);
-  void measureBounds(Rect* bounds) override;
+  void measureBounds(tgfx::Rect* bounds) override;
 
   friend class RenderCache;
 
   friend class PAGStage;
 
   friend class PAGFile;
+
+  friend class AudioClip;
 };
 
 class PreComposeLayer;
@@ -869,7 +892,7 @@ class PAG_API PAGComposition : public PAGLayer {
   void swapLayerAt(int index1, int index2);
 
   /**
-   * The audio data of this composition.
+   * The audio data of this composition, which is an AAC audio in an MPEG-4 container.
    */
   ByteData* audioBytes() const;
 
@@ -912,7 +935,7 @@ class PAG_API PAGComposition : public PAGLayer {
   int heightInternal() const;
   void setContentSizeInternal(int width, int height);
   void draw(Recorder* recorder) override;
-  void measureBounds(Rect* bounds) override;
+  void measureBounds(tgfx::Rect* bounds) override;
   bool hasClip() const;
   Frame frameDuration() const override;
   bool cacheFilters() const override;
@@ -932,7 +955,7 @@ class PAG_API PAGComposition : public PAGLayer {
   static void FindLayers(std::function<bool(PAGLayer* pagLayer)> filterFunc,
                          std::vector<std::shared_ptr<PAGLayer>>* result,
                          std::shared_ptr<PAGLayer> pagLayer);
-  static void MeasureChildLayer(Rect* bounds, PAGLayer* childLayer);
+  static void MeasureChildLayer(tgfx::Rect* bounds, PAGLayer* childLayer);
   static void DrawChildLayer(Recorder* recorder, PAGLayer* childLayer);
   static bool GetTrackMatteLayerAtPoint(PAGLayer* childLayer, float x, float y,
                                         std::vector<std::shared_ptr<PAGLayer>>* results);
@@ -960,6 +983,8 @@ class PAG_API PAGComposition : public PAGLayer {
   friend class PAGImageLayer;
 
   friend class FileReporter;
+
+  friend class AudioClip;
 };
 
 class PAG_API PAGFile : public PAGComposition {
@@ -1071,8 +1096,6 @@ class PAG_API PAGFile : public PAGComposition {
   static std::shared_ptr<PAGLayer> BuildPAGLayer(std::shared_ptr<File> file, pag::Layer* layer);
 
   void setDurationInternal(int64_t duration);
-  std::shared_ptr<PAGImage> replaceImageTemporarily(int editableIndex,
-                                                    std::shared_ptr<PAGImage> image);
   Frame stretchedFrameToFileFrame(Frame stretchedFrame) const;
   int64_t stretchedTimeToFileTime(int64_t stretchedTime) const;
   Frame scaledFrameToFileFrame(Frame scaledFrame, const TimeRange& scaledTimeRange) const;
@@ -1087,61 +1110,15 @@ class PAG_API PAGFile : public PAGComposition {
   friend class PAGImageLayer;
 
   friend class LayerRenderer;
+
+  friend class AudioClip;
 };
 
 class Composition;
 
 class PAGPlayer;
 
-class Context;
-
-class Surface;
-
-class Device;
-
-class Drawable {
- public:
-  virtual ~Drawable() = default;
-
-  /**
-   * Returns the width of this drawable.
-   */
-  virtual int width() const = 0;
-
-  /**
-   * Returns the height of this drawable.
-   */
-  virtual int height() const = 0;
-
-  /**
-   * Update the size of the drawable, and reset the associated backend render target.
-   */
-  virtual void updateSize() = 0;
-
-  /**
-   * Returns the GPU device associated with this drawable.
-   */
-  virtual std::shared_ptr<Device> getDevice() = 0;
-
-  /**
-   * Creates a new Surface from this drawable.
-   */
-  virtual std::shared_ptr<Surface> createSurface(Context* context) = 0;
-
-  /**
-   * Apply all pending changes to the drawable.
-   * Note: The associated GPUDevice must be the current rendering device on the calling thread.
-   */
-  virtual void present(Context* context) = 0;
-
-  /**
-   * Set the presenting timeStamp, used for android
-   */
-  virtual void setTimeStamp(int64_t) {
-  }
-};
-
-class Graphic;
+class GLRestorer;
 
 class PAG_API PAGSurface {
  public:
@@ -1212,15 +1189,16 @@ class PAG_API PAGSurface {
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
-  std::shared_ptr<Device> device = nullptr;
-  std::shared_ptr<Surface> surface = nullptr;
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
+  bool contextAdopted = false;
+  GLRestorer* glRestorer = nullptr;
 
-  explicit PAGSurface(std::shared_ptr<Drawable> drawable);
+  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);
   bool hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, float x, float y);
-  Context* lockContext();
+  tgfx::Context* lockContext();
   void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
 
@@ -1244,6 +1222,8 @@ class PAG_API PAGPlayer {
 
   /**
    * Sets a new PAGComposition for PAGPlayer to render as content.
+   * Note: If the composition is already added to another PAGPlayer, it will be removed from the
+   * previous PAGPlayer.
    */
   void setComposition(std::shared_ptr<PAGComposition> newComposition);
 
@@ -1300,7 +1280,7 @@ class PAG_API PAGPlayer {
   float maxFrameRate();
 
   /**
-   * Set the maximum frame rate for rendering.
+   * Sets the maximum frame rate for rendering.
    */
   void setMaxFrameRate(float value);
 
@@ -1321,7 +1301,7 @@ class PAG_API PAGPlayer {
   Matrix matrix();
 
   /**
-   * Set the transformation which will be applied to the composition. The scaleMode property
+   * Sets the transformation which will be applied to the composition. The scaleMode property
    * will be set to PAGScaleMode::None when this method is called.
    */
   void setMatrix(const Matrix& matrix);
@@ -1349,7 +1329,7 @@ class PAG_API PAGPlayer {
   double getProgress();
 
   /**
-   * Set the progress of play position, the value ranges from 0.0 to 1.0. It is applied only when
+   * Sets the progress of play position, the value ranges from 0.0 to 1.0. It is applied only when
    * the composition is not null.
    */
   void setProgress(double percent);
@@ -1364,6 +1344,13 @@ class PAG_API PAGPlayer {
    * Sets the autoClear property.
    */
   void setAutoClear(bool value);
+
+  /**
+   * Prepares the player for the next flush() call. It collects all CPU tasks from the current
+   * progress of the composition and runs them asynchronously in parallel. It is usually used for
+   * speeding up the first frame rendering.
+   */
+  void prepare();
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more
@@ -1468,6 +1455,7 @@ class PAG_API PAGPlayer {
   void updateStageSize();
   void setSurfaceInternal(std::shared_ptr<PAGSurface> newSurface);
   int64_t getTimeStampInternal();
+  void prepareInternal();
 
   friend class PAGSurface;
 };

@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include "core/Color4f.h"
+#include <optional>
 #include "gpu/GLFragmentProcessor.h"
+#include "tgfx/core/Color.h"
 
-namespace pag {
+namespace tgfx {
 class GLConstColorProcessor : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -30,7 +31,7 @@ class GLConstColorProcessor : public GLFragmentProcessor {
   void onSetData(const ProgramDataManager& programDataManager,
                  const FragmentProcessor& fragmentProcessor) override;
 
-  Color4f colorPrev = Color4f::Invalid();
+  std::optional<Color> colorPrev;
   UniformHandle colorUniform;
 };
-}  // namespace pag
+}  // namespace tgfx

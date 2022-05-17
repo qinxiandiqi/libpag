@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include "core/Color4f.h"
+#include <optional>
 #include "gpu/GLFragmentProcessor.h"
+#include "tgfx/core/Color.h"
 
-namespace pag {
+namespace tgfx {
 class GLSingleIntervalGradientColorizer : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -32,7 +33,7 @@ class GLSingleIntervalGradientColorizer : public GLFragmentProcessor {
   UniformHandle startUniform;
   UniformHandle endUniform;
 
-  Color4f startPrev = Color4f::Invalid();
-  Color4f endPrev = Color4f::Invalid();
+  std::optional<Color> startPrev;
+  std::optional<Color> endPrev;
 };
-}  // namespace pag
+}  // namespace tgfx

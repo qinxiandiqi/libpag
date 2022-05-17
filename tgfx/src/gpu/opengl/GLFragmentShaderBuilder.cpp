@@ -20,7 +20,7 @@
 #include "GLContext.h"
 #include "GLProgramBuilder.h"
 
-namespace pag {
+namespace tgfx {
 static constexpr char kDstColorName[] = "_dstColor";
 
 GLFragmentShaderBuilder::GLFragmentShaderBuilder(ProgramBuilder* program)
@@ -29,10 +29,10 @@ GLFragmentShaderBuilder::GLFragmentShaderBuilder(ProgramBuilder* program)
 }
 
 std::string GLFragmentShaderBuilder::dstColor() {
-  const auto* gl = static_cast<GLProgramBuilder*>(programBuilder)->gl();
-  if (gl->caps->frameBufferFetchSupport) {
-    addFeature(PrivateFeature::FramebufferFetch, gl->caps->frameBufferFetchExtensionString);
-    return gl->caps->frameBufferFetchColorName;
+  auto caps = GLCaps::Get(programBuilder->getContext());
+  if (caps->frameBufferFetchSupport) {
+    addFeature(PrivateFeature::FramebufferFetch, caps->frameBufferFetchExtensionString);
+    return caps->frameBufferFetchColorName;
   }
   return kDstColorName;
 }
@@ -41,4 +41,4 @@ std::string GLFragmentShaderBuilder::colorOutputName() {
   return static_cast<GLProgramBuilder*>(programBuilder)->isDesktopGL() ? CustomColorOutputName()
                                                                        : "gl_FragColor";
 }
-}  // namespace pag
+}  // namespace tgfx

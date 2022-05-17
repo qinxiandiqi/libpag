@@ -19,20 +19,19 @@
 #pragma once
 
 #include "GLBuffer.h"
-#include "GLRenderTarget.h"
-#include "core/Blend.h"
+#include "GLContext.h"
 #include "gpu/AAType.h"
 #include "gpu/FragmentProcessor.h"
 #include "gpu/GeometryProcessor.h"
+#include "tgfx/core/BlendMode.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
-namespace pag {
+namespace tgfx {
 struct DrawArgs {
   Context* context = nullptr;
-  Blend blendMode = Blend::SrcOver;
-  Matrix viewMatrix = Matrix::I();
-  const GLRenderTarget* renderTarget = nullptr;
+  BlendMode blendMode = BlendMode::SrcOver;
+  const RenderTarget* renderTarget = nullptr;
   std::shared_ptr<Texture> renderTargetTexture = nullptr;
-  Rect rectToDraw = Rect::MakeEmpty();
   Rect scissorRect = Rect::MakeEmpty();
   AAType aa = AAType::None;
   std::vector<std::unique_ptr<FragmentProcessor>> colors;
@@ -47,7 +46,23 @@ class GLDrawOp {
 
   virtual std::vector<float> vertices(const DrawArgs& args) = 0;
 
-  virtual std::shared_ptr<GLBuffer> getIndexBuffer(const DrawArgs& args) = 0;
+  virtual void draw(const DrawArgs& args) = 0;
+
+  const Rect& bounds() const {
+    return _bounds;
+  }
+
+ protected:
+  void setBounds(Rect bounds) {
+    _bounds = bounds;
+  }
+
+  void setTransformedBounds(const Rect& srcBounds, const Matrix& matrix) {
+    _bounds = matrix.mapRect(srcBounds);
+  }
+
+ private:
+  Rect _bounds = Rect::MakeEmpty();
 };
 
 class GLDrawer : public Resource {
@@ -56,15 +71,19 @@ class GLDrawer : public Resource {
 
   void draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const;
 
+  static void DrawIndexBuffer(Context* context, const std::shared_ptr<GLBuffer>& indexBuffer);
+
+  static void DrawArrays(Context* context, unsigned mode, int first, int count);
+
  protected:
   void computeRecycleKey(BytesKey*) const override;
 
  private:
   bool init(Context* context);
 
-  void onRelease(Context* context) override;
+  void onReleaseGPU() override;
 
   unsigned vertexArray = 0;
   unsigned vertexBuffer = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

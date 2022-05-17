@@ -19,9 +19,9 @@
 #pragma once
 
 #import <UIKit/UIKit.h>
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
-namespace pag {
+namespace tgfx {
 class EAGLHardwareTexture : public GLTexture {
  public:
   static std::shared_ptr<EAGLHardwareTexture> MakeFrom(Context* context,
@@ -30,16 +30,15 @@ class EAGLHardwareTexture : public GLTexture {
   explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer);
 
   ~EAGLHardwareTexture() override;
-  size_t memoryUsage() const override;
 
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override;
-  void onRelease(Context*) override;
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLESTextureRef texture = nil;
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
+  void onReleaseGPU() override;
 };
-}  // namespace pag
+}  // namespace tgfx

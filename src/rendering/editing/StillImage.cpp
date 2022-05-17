@@ -17,115 +17,85 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StillImage.h"
+#include "base/utils/TGFXCast.h"
 #include "base/utils/UniqueID.h"
-#include "gpu/opengl/GLDevice.h"
 #include "pag/pag.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Picture.h"
-#include "rendering/graphics/Recorder.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
-
 std::shared_ptr<PAGImage> PAGImage::FromPath(const std::string& filePath) {
-  auto pagImage = std::make_shared<StillImage>();
-  pagImage->image = Image::MakeFrom(filePath);
-  auto picture = Picture::MakeFrom(pagImage->uniqueID(), pagImage->image);
-  if (!picture) {
-    return nullptr;
-  }
-  pagImage->reset(picture);
-  return pagImage;
+  auto image = tgfx::Image::MakeFrom(filePath);
+  return StillImage::MakeFrom(std::move(image));
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromBytes(const void* bytes, size_t length) {
-  auto pagImage = std::make_shared<StillImage>();
-  auto fileBytes = Data::MakeWithCopy(bytes, length);
-  pagImage->image = Image::MakeFrom(std::move(fileBytes));
-  auto picture = Picture::MakeFrom(pagImage->uniqueID(), pagImage->image);
-  if (!picture) {
-    return nullptr;
-  }
-  pagImage->reset(picture);
-  return pagImage;
+  auto fileBytes = tgfx::Data::MakeWithCopy(bytes, length);
+  auto image = tgfx::Image::MakeFrom(std::move(fileBytes));
+  return StillImage::MakeFrom(std::move(image));
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromPixels(const void* pixels, int width, int height,
                                                size_t rowBytes, ColorType colorType,
                                                AlphaType alphaType) {
-  auto pixelBuffer = PixelBuffer::Make(width, height);
-  Bitmap bitmap(pixelBuffer);
+  auto pixelBuffer = tgfx::PixelBuffer::Make(width, height);
+  tgfx::Bitmap bitmap(pixelBuffer);
   if (bitmap.isEmpty()) {
     return nullptr;
   }
-  auto info = ImageInfo::Make(width, height, colorType, alphaType, rowBytes);
+  auto info = tgfx::ImageInfo::Make(width, height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
   auto result = bitmap.writePixels(info, pixels);
   if (!result) {
     return nullptr;
   }
-  return StillImage::FromPixelBuffer(pixelBuffer);
+  return StillImage::MakeFrom(pixelBuffer);
 }
 
-std::shared_ptr<StillImage> StillImage::FromPixelBuffer(std::shared_ptr<PixelBuffer> pixelBuffer) {
+std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer) {
   if (pixelBuffer == nullptr) {
     return nullptr;
   }
-  auto pagImage = std::make_shared<StillImage>();
+  auto pagImage =
+      std::shared_ptr<StillImage>(new StillImage(pixelBuffer->width(), pixelBuffer->height()));
   auto picture = Picture::MakeFrom(pagImage->uniqueID(), pixelBuffer);
   if (!picture) {
     return nullptr;
   }
-  pagImage->reset(picture);
+  pagImage->graphic = picture;
   return pagImage;
 }
 
-std::shared_ptr<StillImage> StillImage::FromImage(std::shared_ptr<Image> image) {
+std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::Image> image) {
   if (image == nullptr) {
     return nullptr;
   }
-  auto pagImage = std::make_shared<StillImage>();
-  pagImage->image = std::move(image);
-  auto picture = Picture::MakeFrom(pagImage->uniqueID(), pagImage->image);
+  auto width = image->width();
+  auto height = image->height();
+  ApplyOrientation(image->orientation(), &width, &height);
+  auto pagImage = std::shared_ptr<StillImage>(new StillImage(width, height));
+  auto picture = Picture::MakeFrom(pagImage->uniqueID(), image);
   if (!picture) {
     return nullptr;
   }
-  pagImage->reset(picture);
+  pagImage->graphic = picture;
   return pagImage;
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, ImageOrigin origin) {
-  auto context = GLDevice::CurrentNativeHandle();
+  auto context = tgfx::GLDevice::CurrentNativeHandle();
   if (context == nullptr) {
-    LOGE("PAGImage.MakeFrom() There is no current GPU context on the calling thread.");
+    LOGE("PAGImage.FromTexture() There is no current GPU context on the calling thread.");
     return nullptr;
   }
-  auto pagImage = std::make_shared<StillImage>();
-  auto picture = Picture::MakeFrom(pagImage->uniqueID(), texture, origin);
+  auto pagImage = std::shared_ptr<StillImage>(new StillImage(texture.width(), texture.height()));
+  auto picture = Picture::MakeFrom(pagImage->uniqueID(), texture, ToTGFX(origin));
   if (!picture) {
     LOGE("PAGImage.MakeFrom() The texture is invalid.");
     return nullptr;
   }
-  pagImage->reset(picture);
+  pagImage->graphic = picture;
   return pagImage;
-}
-
-void StillImage::measureBounds(Rect* bounds) {
-  graphic->measureBounds(bounds);
-}
-
-Rect StillImage::getContentSize() const {
-  return Rect::MakeWH(static_cast<float>(width), static_cast<float>(height));
-}
-
-void StillImage::draw(Recorder* recorder) {
-  recorder->drawGraphic(graphic);
-}
-
-void StillImage::reset(std::shared_ptr<Graphic> g) {
-  Rect bounds = {};
-  g->measureBounds(&bounds);
-  width = static_cast<int>(bounds.width());
-  height = static_cast<int>(bounds.height());
-  graphic = g;
 }
 }  // namespace pag

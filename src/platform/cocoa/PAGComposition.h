@@ -19,7 +19,7 @@
 #import <Foundation/Foundation.h>
 #import "PAGLayer.h"
 
-__attribute__((visibility("default"))) @interface PAGComposition : PAGLayer
+PAG_API @interface PAGComposition : PAGLayer
 
 /**
  * Make a empty PAGComposition with specified size.
@@ -125,7 +125,7 @@ __attribute__((visibility("default"))) @interface PAGComposition : PAGLayer
 - (void)swapLayerAt:(int)index1 withIndex:(int)index2;
 
 /**
- * Returns the audio data of this composition.
+ * Returns the audio data of this composition, which is an AAC audio in an MPEG-4 container.
  */
 - (NSData*)audioBytes;
 

@@ -16,15 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/GetTimer.h"
-#include "gpu/Canvas.h"
-#include "gpu/opengl/GLDevice.h"
+#include "base/utils/TGFXCast.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/Drawable.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Recorder.h"
+#include "rendering/utils/GLRestorer.h"
 #include "rendering/utils/LockGuard.h"
+#include "tgfx/core/Clock.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 
@@ -35,39 +36,43 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
   return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable)));
 }
 
-static std::shared_ptr<Device> GetCurrentDevice(bool forAsyncThread) {
-  if (forAsyncThread) {
-    auto sharedContext = GLDevice::CurrentNativeHandle();
-    auto device = GLDevice::Make(sharedContext);
-    if (device) {
-      return device;
-    }
-  }
-  return GLDevice::Current();
-}
-
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
                                                  ImageOrigin origin) {
-  auto device = GLDevice::Current();
+  auto device = tgfx::GLDevice::Current();
   if (device == nullptr || !renderTarget.isValid()) {
     return nullptr;
   }
-  auto drawable = std::make_shared<RenderTargetDrawable>(device, renderTarget, origin);
-  return MakeFrom(std::move(drawable));
+  auto drawable = std::make_shared<RenderTargetDrawable>(device, renderTarget, ToTGFX(origin));
+  if (drawable == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), true));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                                  bool forAsyncThread) {
-  auto device = GetCurrentDevice(forAsyncThread);
+  std::shared_ptr<tgfx::Device> device = nullptr;
+  bool isAdopted = false;
+  if (forAsyncThread) {
+    auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
+    device = tgfx::GLDevice::Make(sharedContext);
+  }
+  if (device == nullptr) {
+    device = tgfx::GLDevice::Current();
+    isAdopted = true;
+  }
   if (device == nullptr || !texture.isValid()) {
     return nullptr;
   }
-  auto drawable = std::make_shared<TextureDrawable>(device, texture, origin);
-  return MakeFrom(std::move(drawable));
+  auto drawable = std::make_shared<TextureDrawable>(device, texture, ToTGFX(origin));
+  if (drawable == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), isAdopted));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
-  auto device = GLDevice::Make();
+  auto device = tgfx::GLDevice::Make();
   if (device == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -75,7 +80,8 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
   return std::shared_ptr<PAGSurface>(new PAGSurface(drawable));
 }
 
-PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable) : drawable(std::move(drawable)) {
+PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted)
+    : drawable(std::move(drawable)), contextAdopted(contextAdopted) {
   rootLocker = std::make_shared<std::mutex>();
 }
 
@@ -92,7 +98,7 @@ int PAGSurface::height() {
 void PAGSurface::updateSize() {
   LockGuard autoLock(rootLocker);
   surface = nullptr;
-  device = nullptr;
+  drawable->freeDevice();
   drawable->updateSize();
 }
 
@@ -102,20 +108,18 @@ void PAGSurface::freeCache() {
     pagPlayer->renderCache->releaseAll();
   }
   surface = nullptr;
-  if (device) {
-    auto context = device->lockContext();
-    if (context) {
-      context->purgeResourcesNotUsedIn(0);
-      device->unlock();
-    }
+  auto context = drawable->lockContext();
+  if (context) {
+    context->purgeResourcesNotUsedIn(0);
+    drawable->unlockContext();
   }
-  device = nullptr;
+  drawable->freeDevice();
 }
 
 bool PAGSurface::clearAll() {
   LockGuard autoLock(rootLocker);
-  if (device == nullptr) {
-    device = drawable->getDevice();
+  if (!drawable->prepareDevice()) {
+    return false;
   }
   auto context = lockContext();
   if (!context) {
@@ -145,8 +149,8 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
   if (surface == nullptr || !context) {
     return false;
   }
-  auto info =
-      ImageInfo::Make(surface->width(), surface->height(), colorType, alphaType, dstRowBytes);
+  auto info = tgfx::ImageInfo::Make(surface->width(), surface->height(), ToTGFX(colorType),
+                                    ToTGFX(alphaType), dstRowBytes);
   auto result = surface->readPixels(info, dstPixels);
   unlockContext();
   return result;
@@ -154,8 +158,8 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
 
 bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
                       BackendSemaphore* signalSemaphore, bool autoClear) {
-  if (device == nullptr) {
-    device = drawable->getDevice();
+  if (!drawable->prepareDevice()) {
+    return false;
   }
   auto context = lockContext();
   if (!context) {
@@ -181,7 +185,13 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   if (graphic) {
     graphic->draw(canvas, cache);
   }
-  surface->flush(signalSemaphore);
+  if (signalSemaphore == nullptr) {
+    surface->flush();
+  } else {
+    tgfx::GLSemaphore semaphore = {};
+    surface->flush(&semaphore);
+    signalSemaphore->initGL(semaphore.glSync);
+  }
   cache->detachFromContext();
   drawable->setTimeStamp(pagPlayer->getTimeStampInternal());
   drawable->present(context);
@@ -193,8 +203,8 @@ bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
   if (!waitSemaphore.isInitialized()) {
     return false;
   }
-  if (device == nullptr) {
-    device = drawable->getDevice();
+  if (!drawable->prepareDevice()) {
+    return false;
   }
   auto context = lockContext();
   if (!context) {
@@ -207,7 +217,8 @@ bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
     unlockContext();
     return false;
   }
-  auto ret = surface->wait(waitSemaphore);
+  auto semaphore = ToTGFX(waitSemaphore);
+  auto ret = surface->wait(&semaphore);
   unlockContext();
   return ret;
 }
@@ -227,17 +238,22 @@ bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, f
   return result;
 }
 
-Context* PAGSurface::lockContext() {
-  if (device == nullptr) {
-    return nullptr;
+tgfx::Context* PAGSurface::lockContext() {
+  auto context = drawable->lockContext();
+  if (context != nullptr && contextAdopted) {
+#ifndef PAG_BUILD_FOR_WEB
+    glRestorer = new GLRestorer(tgfx::GLFunctions::Get(context));
+#endif
+    context->resetState();
   }
-  return device->lockContext();
+  return context;
 }
 
 void PAGSurface::unlockContext() {
-  if (device == nullptr) {
-    return;
+  if (contextAdopted) {
+    delete glRestorer;
+    glRestorer = nullptr;
   }
-  device->unlock();
+  drawable->unlockContext();
 }
 }  // namespace pag

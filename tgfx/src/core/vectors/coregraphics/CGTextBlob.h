@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "core/TextBlob.h"
+#include "tgfx/core/TextBlob.h"
 
-namespace pag {
+namespace tgfx {
 class CGTextBlob : public TextBlob {
  public:
   std::shared_ptr<TextureBuffer> getImage(float resolutionScale, Matrix* matrix) const;
 };
-}  // namespace pag
+}  // namespace tgfx

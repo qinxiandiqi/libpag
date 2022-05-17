@@ -18,10 +18,10 @@
 
 #include "TextRenderer.h"
 #include "TextAnimatorRenderer.h"
-#include "core/PathEffect.h"
+#include "base/utils/TGFXCast.h"
 #include "rendering/graphics/Shape.h"
 #include "rendering/graphics/Text.h"
-#include "rendering/utils/TGFXTypes.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace pag {
 
@@ -32,8 +32,8 @@ struct GlyphInfo {
   int glyphIndex = 0;
   std::string name;
   float advance = 0;
-  Point position = Point::Zero();
-  Rect bounds = Rect::MakeEmpty();
+  tgfx::Point position = tgfx::Point::Zero();
+  tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
 };
 
 struct TextLayout {
@@ -44,32 +44,10 @@ struct TextLayout {
   float firstBaseLine = 0;
   float baselineShift = 0;
   Enum justification = 0;
-  Rect boxRect = Rect::MakeEmpty();
+  tgfx::Rect boxRect = tgfx::Rect::MakeEmpty();
   float glyphScale = 1.0f;
-  Matrix coordinateMatrix = Matrix::I();
+  tgfx::Matrix coordinateMatrix = tgfx::Matrix::I();
 };
-
-TextPaint CreateTextPaint(const TextDocument* textDocument) {
-  TextPaint textPaint = {};
-  if (textDocument->applyFill && textDocument->applyStroke) {
-    textPaint.style = TextStyle::StrokeAndFill;
-  } else if (textDocument->applyStroke) {
-    textPaint.style = TextStyle::Stroke;
-  } else {
-    textPaint.style = TextStyle::Fill;
-  }
-  textPaint.fillColor = textDocument->fillColor;
-  textPaint.strokeColor = textDocument->strokeColor;
-  textPaint.strokeWidth = textDocument->strokeWidth;
-  textPaint.strokeOverFill = textDocument->strokeOverFill;
-  textPaint.fontFamily = textDocument->fontFamily;
-  textPaint.fontStyle = textDocument->fontStyle;
-  textPaint.fontSize = textDocument->fontSize;
-  textPaint.fauxBold = textDocument->fauxBold;
-  textPaint.fauxItalic = textDocument->fauxItalic;
-  textPaint.isVertical = textDocument->direction == TextDirection::Vertical;
-  return textPaint;
-}
 
 std::vector<GlyphInfo> CreateGlyphInfos(const std::vector<GlyphHandle>& glyphList) {
   std::vector<GlyphInfo> glyphInfos = {};
@@ -82,7 +60,7 @@ std::vector<GlyphInfo> CreateGlyphInfos(const std::vector<GlyphHandle>& glyphLis
     info.bounds = glyph->getBounds();
     // 当文本为竖版时，需要先转换为横排进行布局计算
     if (glyph->isVertical()) {
-      Matrix matrix = Matrix::I();
+      tgfx::Matrix matrix = tgfx::Matrix::I();
       matrix.setRotate(-90);
       matrix.mapRect(&info.bounds);
     }
@@ -96,7 +74,7 @@ TextLayout CreateTextLayout(const TextDocument* textDocument,
   TextLayout layout = {};
   auto isVertical = textDocument->direction == TextDirection::Vertical;
   if (!textDocument->boxText) {
-    layout.boxRect = Rect::MakeEmpty();
+    layout.boxRect = tgfx::Rect::MakeEmpty();
     if (isVertical) {
       layout.coordinateMatrix.setRotate(90);
     }
@@ -104,13 +82,13 @@ TextLayout CreateTextLayout(const TextDocument* textDocument,
     if (isVertical) {
       auto boxRight = textDocument->boxTextPos.x + textDocument->boxTextSize.x;
       layout.boxRect =
-          Rect::MakeXYWH(0, 0, textDocument->boxTextSize.y, textDocument->boxTextSize.x);
+          tgfx::Rect::MakeXYWH(0, 0, textDocument->boxTextSize.y, textDocument->boxTextSize.x);
       layout.firstBaseLine = boxRight - textDocument->firstBaseLine;
       layout.coordinateMatrix.setRotate(90);
       layout.coordinateMatrix.postTranslate(boxRight, textDocument->boxTextPos.y);
     } else {
       layout.boxRect =
-          Rect::MakeXYWH(0, 0, textDocument->boxTextSize.x, textDocument->boxTextSize.y);
+          tgfx::Rect::MakeXYWH(0, 0, textDocument->boxTextSize.x, textDocument->boxTextSize.y);
       layout.firstBaseLine = textDocument->firstBaseLine - textDocument->boxTextPos.y;
       layout.coordinateMatrix.setTranslate(textDocument->boxTextPos.x, textDocument->boxTextPos.y);
     }
@@ -225,7 +203,7 @@ static void AdjustToFitBox(TextLayout* layout, std::vector<GlyphInfo>* glyphInfo
 }
 
 static float CalculateDrawX(Enum justification, float lineWidth, bool isLastLine,
-                            const Rect& boxRect) {
+                            const tgfx::Rect& boxRect) {
   float drawX;
 
   if (boxRect.isEmpty()) {
@@ -272,7 +250,8 @@ static float CalculateDrawX(Enum justification, float lineWidth, bool isLastLine
 }
 
 static float CalculateLetterSpacing(Enum justification, float tracking, float lineWidth,
-                                    size_t lineGlyphCount, bool isLastLine, const Rect& boxRect) {
+                                    size_t lineGlyphCount, bool isLastLine,
+                                    const tgfx::Rect& boxRect) {
   if (boxRect.isEmpty()) {
     return tracking;
   }
@@ -301,7 +280,7 @@ static float CalculateLetterSpacing(Enum justification, float tracking, float li
 }
 
 static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
-    const TextLayout& layout, std::vector<GlyphInfo>* glyphInfos, Rect* bounds) {
+    const TextLayout& layout, std::vector<GlyphInfo>* glyphInfos, tgfx::Rect* bounds) {
   float maxWidth, maxY;
   if (layout.boxRect.isEmpty()) {
     maxWidth = std::numeric_limits<float>::infinity();
@@ -347,8 +326,8 @@ static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
     if (!glyphLine.empty()) {
       lineList.push_back(glyphLine);
     } else {
-      auto emptyLineBounds = Rect::MakeLTRB(drawX, drawY + layout.fontTop, drawX + EMPTY_LINE_WIDTH,
-                                            drawY + layout.fontBottom);
+      auto emptyLineBounds = tgfx::Rect::MakeLTRB(
+          drawX, drawY + layout.fontTop, drawX + EMPTY_LINE_WIDTH, drawY + layout.fontBottom);
       bounds->join(emptyLineBounds);
     }
     baseLine += layout.lineGap;
@@ -366,7 +345,7 @@ static std::vector<std::vector<GlyphHandle>> ApplyMatrixToGlyphs(
     std::vector<GlyphHandle> glyphLine = {};
     for (auto& info : line) {
       auto& glyph = (*glyphList)[info->glyphIndex];
-      auto matrix = Matrix::MakeScale(layout.glyphScale);
+      auto matrix = tgfx::Matrix::MakeScale(layout.glyphScale);
       auto pos = info->position;
       layout.coordinateMatrix.mapPoints(&pos, 1);
       matrix.postTranslate(pos.x, pos.y);
@@ -380,18 +359,19 @@ static std::vector<std::vector<GlyphHandle>> ApplyMatrixToGlyphs(
   return glyphLines;
 }
 
-static Path RenderBackgroundPath(const std::vector<std::vector<GlyphHandle>>& glyphLines,
-                                 float margin, float lineTop, float lineBottom, bool isVertical) {
-  Path backgroundPath = {};
-  std::vector<Rect> lineRectList = {};
+static tgfx::Path RenderBackgroundPath(const std::vector<std::vector<GlyphHandle>>& glyphLines,
+                                       float margin, float lineTop, float lineBottom,
+                                       bool isVertical) {
+  tgfx::Path backgroundPath = {};
+  std::vector<tgfx::Rect> lineRectList = {};
   for (auto& line : glyphLines) {
-    Rect lineRect = Rect::MakeEmpty();
+    tgfx::Rect lineRect = tgfx::Rect::MakeEmpty();
     for (auto& glyph : line) {
-      Rect textBounds = {};
+      tgfx::Rect textBounds = {};
       if (isVertical) {
-        textBounds = Rect::MakeLTRB(-lineBottom, 0, -lineTop, glyph->getAdvance());
+        textBounds = tgfx::Rect::MakeLTRB(-lineBottom, 0, -lineTop, glyph->getAdvance());
       } else {
-        textBounds = Rect::MakeLTRB(0, lineTop, glyph->getAdvance(), lineBottom);
+        textBounds = tgfx::Rect::MakeLTRB(0, lineTop, glyph->getAdvance(), lineBottom);
       }
       glyph->getMatrix().mapRect(&textBounds);
       lineRect.join(textBounds);
@@ -427,7 +407,7 @@ static Path RenderBackgroundPath(const std::vector<std::vector<GlyphHandle>>& gl
     lineRect.bottom += bottomInset;
     topInset = bottomInset;  // 下一行的topInset是上一行的bottomInset.
     rightInset = leftInset;
-    Path tempPath = {};
+    tgfx::Path tempPath = {};
     // 必须round一下避开浮点计算误差，规避 Path 合并的 Bug，否则得到中间断开的不连续矩形。
     lineRect.round();
     tempPath.addRect(lineRect);
@@ -463,38 +443,38 @@ std::shared_ptr<Graphic> RenderTextBackground(const std::vector<std::vector<Glyp
   if (maxRadius >= 25.0f) {
     maxRadius = 25.0f;
   }
-  auto effect = PathEffect::MakeCorner(maxRadius);
+  auto effect = tgfx::PathEffect::MakeCorner(maxRadius);
   if (effect) {
     effect->applyTo(&backgroundPath);
   }
-  auto graphic = Shape::MakeFrom(backgroundPath, ToTGFXColor(textDocument->backgroundColor));
-  auto modifier = Modifier::MakeBlend(ToAlpha(textDocument->backgroundAlpha), Blend::SrcOver);
+  auto graphic = Shape::MakeFrom(backgroundPath, ToTGFX(textDocument->backgroundColor));
+  auto modifier =
+      Modifier::MakeBlend(ToAlpha(textDocument->backgroundAlpha), tgfx::BlendMode::SrcOver);
   return Graphic::MakeCompose(graphic, modifier);
 }
 
-std::unique_ptr<TextContent> RenderTexts(Property<TextDocumentHandle>* sourceText, TextPathOptions*,
-                                         TextMoreOptions*, std::vector<TextAnimator*>* animators,
-                                         Frame layerFrame) {
-  auto textDocument = sourceText->getValueAt(layerFrame);
-  auto textPaint = CreateTextPaint(textDocument.get());
-  auto glyphList = Glyph::BuildFromText(textDocument->text, textPaint);
+std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& textGlyphs,
+                                         TextPathOptions*, TextMoreOptions*,
+                                         std::vector<TextAnimator*>* animators, Frame layerFrame) {
+  auto* textDocument = textGlyphs->textDocument();
+  auto glyphList = textGlyphs->getGlyphs();
   // 无论文字朝向，都先按从(0,0)点开始的横向矩形排版。
   // 提取出跟文字朝向无关的 GlyphInfo 列表与 TextLayout,
   // 复用同一套排版规则。如果最终是纵向排版，再把坐标转成纵向坐标应用到 glyphList 上。
   auto glyphInfos = CreateGlyphInfos(glyphList);
-  auto textLayout = CreateTextLayout(textDocument.get(), glyphList);
+  auto textLayout = CreateTextLayout(textDocument, glyphList);
   if (textDocument->boxText) {
     AdjustToFitBox(&textLayout, &glyphInfos, textDocument->fontSize);
   }
-  Rect textBounds = Rect::MakeEmpty();
+  tgfx::Rect textBounds = tgfx::Rect::MakeEmpty();
   auto glyphInfoLines = ApplyLayoutToGlyphInfos(textLayout, &glyphInfos, &textBounds);
   auto glyphLines = ApplyMatrixToGlyphs(textLayout, glyphInfoLines, &glyphList);
   textLayout.coordinateMatrix.mapRect(&textBounds);
   auto hasAnimators =
-      TextAnimatorRenderer::ApplyToGlyphs(glyphLines, animators, textDocument.get(), layerFrame);
+      TextAnimatorRenderer::ApplyToGlyphs(glyphLines, animators, textDocument, layerFrame);
   std::vector<std::shared_ptr<Graphic>> contents = {};
   if (textDocument->backgroundAlpha > 0) {
-    auto background = RenderTextBackground(glyphLines, textDocument.get());
+    auto background = RenderTextBackground(glyphLines, textDocument);
     if (background) {
       contents.push_back(background);
     }
@@ -512,19 +492,20 @@ std::unique_ptr<TextContent> RenderTexts(Property<TextDocumentHandle>* sourceTex
     }
   }
 
-  auto normalText = Text::MakeFrom(simpleGlyphs, hasAnimators ? nullptr : &textBounds);
+  auto normalText = Text::MakeFrom(simpleGlyphs, textGlyphs, hasAnimators ? nullptr : &textBounds);
   if (normalText) {
     contents.push_back(normalText);
   }
   auto graphic = Graphic::MakeCompose(contents);
-  auto colorText = Text::MakeFrom(colorGlyphs);
-  return std::unique_ptr<TextContent>(new TextContent(std::move(graphic), std::move(colorText)));
+  auto colorText = Text::MakeFrom(colorGlyphs, textGlyphs);
+  return std::make_unique<TextContent>(std::move(graphic), std::move(colorText));
 }
 
-void CalculateTextAscentAndDescent(TextDocumentHandle textDocument, float* pMinAscent,
+void CalculateTextAscentAndDescent(const TextDocument* textDocument, float* pMinAscent,
                                    float* pMaxDescent) {
-  auto textPaint = CreateTextPaint(textDocument.get());
-  auto glyphList = Glyph::BuildFromText(textDocument->text, textPaint);
+  auto glyphs = GetSimpleGlyphs(textDocument);
+  auto paint = CreateTextPaint(textDocument);
+  auto glyphList = MutableGlyph::BuildFromText(glyphs, paint);
 
   float minAscent = 0;
   float maxDescent = 0;
@@ -536,5 +517,4 @@ void CalculateTextAscentAndDescent(TextDocumentHandle textDocument, float* pMinA
   *pMinAscent = minAscent;
   *pMaxDescent = maxDescent;
 }
-
 }  // namespace pag

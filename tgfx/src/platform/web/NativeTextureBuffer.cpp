@@ -17,11 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeTextureBuffer.h"
-#include "gpu/opengl/GLTexture.h"
+#include "gpu/opengl/GLContext.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<NativeTextureBuffer> NativeTextureBuffer::Make(int width, int height, val source) {
   if (!source.as<bool>()) {
     return nullptr;
@@ -35,10 +36,10 @@ std::shared_ptr<Texture> NativeTextureBuffer::makeTexture(Context* context) cons
   if (texture == nullptr) {
     return nullptr;
   }
-  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->getGLInfo();
-  const auto* gl = GLContext::Unwrap(context);
+  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
+  auto gl = GLFunctions::Get(context);
   gl->bindTexture(glInfo.target, glInfo.id);
   source.call<void>("upload", val::module_property("GL"));
   return texture;
 }
-}  // namespace pag
+}  // namespace tgfx

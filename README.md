@@ -64,20 +64,19 @@ features like video templates.
 - Android 4.4 or later
 - macOS 10.13 or later
 - Windows 7.0 or later
-- Chrome 87.0 or later (Web)
-- Safari 11.1 or later (Web)
+- Chrome 69.0 or later (Web)
+- Safari 11.3 or later (Web)
 
 ## Getting Started
 
-We currently only publish precompiled libraries for iOS and Android. You can build libraries of
+We currently only publish precompiled libraries for iOS, Android, and Web. You can build libraries of
 other platforms from the source code. The latest releases can be downloaded
 from [here](https://github.com/Tencent/libpag/releases).
 
-### iOS Installation
+### iOS Integration
 
 You can use the framework downloaded from the release page, or add libpag to your project by
 CocoaPods:
-
 Add the pod to your Podfile:
 
 ```
@@ -96,7 +95,7 @@ After installing the cocoapod into your project import libpag with
 #import <libpag/xxx.h>
 ```
 
-### Android Installation
+### Android Integration
 
 You can use the aar downloaded from the release page, or add libpag to your project by Maven:
 
@@ -113,11 +112,11 @@ buildscript {
 }
 ```
 
-Add libpag to `app/build.gradle` (*`3.2.7.34` should be replaced with the latest release version*):
+Add libpag to `app/build.gradle` (*`3.2.7.40` should be replaced with the latest release version*):
 
 ```
 dependencies {
-    implementation 'com.tencent.tav:libpag:3.2.7.34'
+    implementation 'com.tencent.tav:libpag:3.2.7.40'
 }
 ```
 
@@ -129,6 +128,36 @@ Add the following rule to your proguard rules to avoid the wrong obfuscation.
 
 Finally, run gradle sync and then build the project.
 
+### Web Integration
+
+Simply copy the following code into an HTML file and open it in your browser:
+
+```html
+<canvas class="canvas" id="pag"></canvas>
+<script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
+<script>
+  window.libpag.PAGInit().then((PAG) => {
+    const url = 'https://pag.io/file/like.pag';
+    fetch(url)
+      .then((response) => response.blob())
+      .then(async (blob) => {
+        const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
+        // Do Something.
+      });
+  });
+</script>
+```
+More information：[Web SDK Guide](./web/README.md)
+
+
+### Example
+
+Check out the following projects to learn how to use the APIs of libpag:
+
+- [https://github.com/libpag/pag-ios](https://github.com/libpag/pag-ios)
+- [https://github.com/libpag/pag-android](https://github.com/libpag/pag-android)
+- [https://github.com/libpag/pag-web](https://github.com/libpag/pag-web)
+
 ### Documentation
 
 - [iOS API Reference](https://pag.io/api.html#/apis/ios/)
@@ -139,19 +168,17 @@ You can find other docs on [pag.io](https://pag.io/docs/sdk.html)
 
 ## Development
 
-We recommend using CLion IDE on macOS platform for development.
+We recommend using CLion IDE on the macOS platform for development.
 
 ### Branch Management
 
-- The `main` branch is our active developing branch. After full testing, we will periodically pull
-  the pre-release branch based on the main branch.
-- The `release` branch is our stable release branch, which is fully tested and already used in many
-  apps.
+- The `main` branch is our active developing branch which contains the latest features and bugfixes. 
+- The branches under `release/` are our stable milestone branches which are fully tested. We will 
+periodically cut a `release/{version}` branch from the `main` branch. After one `release/{version}` 
+branch is cut, only high priority fixes are checked into it.
 
-**Note: This repository only contains the code of PAG 4.0, which is still under active development.
-So there is no `release` branch yet at this moment. We are working hard to make a stable release of
-PAG 4.0 available as soon as possible. For using PAG 3.0 versions, you can download the precompiled
-libraries from [here](https://github.com/Tencent/libpag/releases).**
+**Note: This repository only contains the latest code since PAG 4.0. To use the legacy PAG 3.0 
+versions, you can download the precompiled libraries from [here](https://github.com/Tencent/libpag/releases).**
 
 ### Build Prerequisites
 
@@ -195,14 +222,29 @@ Git account and password may be required during synchronizing. Please make sure 
 
 ### Build
 
-After the synchronization, open the project with CLion, then you are good to go!
+After the synchronization, you can open the project with CLion and build the pag library.
 
-**Note: If anything goes wrong during cmake building, please update the cmake tool to the latest
+**For macOS platform：**
+
+There are no extra configurations of CLion required.
+
+**For Windows platform：**
+
+Please follow the following steps to configure the CLion environment correctly:
+
+- Make sure you have installed at least the **[Desktop development with C++]** and **[Universal Windows Platform development]** components for VS2019.
+- Open the **File->Setting** panel, and go to **Build, Execution, Deployment->ToolChains**, then set the toolchain of CLion to **Visual Studio** with **amd64 (Recommended)** or **x86** architecture.
+
+**Note: If anything goes wrong during cmake building, please update the cmake commandline tool to the latest
 version and try again.**
 
 ## License
 
 libpag is licensed under the [Apache Version 2.0 License](./LICENSE.txt)
+
+## Privacy Policy
+
+Please comply with [the personal information processing rules of PAG SDK](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd) while using libpag SDK
 
 ## Contribution
 

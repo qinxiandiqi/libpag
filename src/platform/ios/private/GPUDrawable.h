@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/opengl/eagl/EAGLWindow.h"
-#include "pag/pag.h"
+#include "rendering/Drawable.h"
+#include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
 
 namespace pag {
 
@@ -41,13 +41,14 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
-  std::shared_ptr<Device> getDevice() override;
+  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
-
-  void present(Context* context) override;
+  void present(tgfx::Context* context) override;
 
   CVPixelBufferRef getCVPixelBuffer();
+
+ protected:
+  std::shared_ptr<tgfx::Device> getDevice() override;
 
  private:
   std::weak_ptr<GPUDrawable> weakThis;
@@ -56,8 +57,8 @@ class GPUDrawable : public Drawable {
   CAEAGLLayer* layer = nil;
   CVPixelBufferRef pixelBuffer = nil;
   EAGLContext* eaglContext = nil;
-  std::shared_ptr<EAGLWindow> window = nullptr;
-  std::shared_ptr<Surface> surface = nullptr;
+  std::shared_ptr<tgfx::EAGLWindow> window = nullptr;
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
   std::atomic<bool> bufferPreparing;
 
   static bool IsInMainThread();

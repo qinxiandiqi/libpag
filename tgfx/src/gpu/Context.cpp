@@ -16,15 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Context.h"
-#include "base/utils/GetTimer.h"
-#include "base/utils/Log.h"
+#include "tgfx/gpu/Context.h"
+#include "core/utils/Log.h"
 #include "gpu/GradientCache.h"
-#include "gpu/Program.h"
 #include "gpu/ProgramCache.h"
-#include "gpu/ResourceCache.h"
+#include "tgfx/core/Clock.h"
+#include "tgfx/gpu/ResourceCache.h"
 
-namespace pag {
+namespace tgfx {
 Context::Context(Device* device) : _device(device) {
   _gradientCache = new GradientCache(this);
   _programCache = new ProgramCache(this);
@@ -59,4 +58,4 @@ void Context::releaseAll(bool releaseGPU) {
   _programCache->releaseAll(releaseGPU);
   _resourceCache->releaseAll(releaseGPU);
 }
-}  // namespace pag
+}  // namespace tgfx

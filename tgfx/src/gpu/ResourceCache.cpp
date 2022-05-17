@@ -16,15 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ResourceCache.h"
+#include "tgfx/gpu/ResourceCache.h"
 #include <unordered_map>
 #include <unordered_set>
-#include "base/utils/GetTimer.h"
-#include "base/utils/Log.h"
-#include "core/utils/BytesKey.h"
-#include "gpu/Resource.h"
+#include "core/utils/Log.h"
+#include "tgfx/core/BytesKey.h"
+#include "tgfx/core/Clock.h"
+#include "tgfx/gpu/Resource.h"
 
-namespace pag {
+namespace tgfx {
 static thread_local std::unordered_set<ResourceCache*> currentThreadCaches = {};
 
 class PurgeGuard {
@@ -79,7 +79,7 @@ void ResourceCache::releaseAll(bool releaseGPU) {
   PurgeGuard guard(this);
   for (auto& resource : nonpurgeableResources) {
     if (releaseGPU) {
-      resource->onRelease(context);
+      resource->onReleaseGPU();
     }
     // 标记 Resource 已经被释放，等外部指针计数为 0 时可以直接 delete。
     resource->context = nullptr;
@@ -88,7 +88,7 @@ void ResourceCache::releaseAll(bool releaseGPU) {
   for (auto& item : recycledResources) {
     for (auto& resource : item.second) {
       if (releaseGPU) {
-        resource->onRelease(context);
+        resource->onReleaseGPU();
       }
       delete resource;
     }
@@ -98,7 +98,7 @@ void ResourceCache::releaseAll(bool releaseGPU) {
 
 void ResourceCache::purgeNotUsedIn(int64_t usNotUsed) {
   PurgeGuard guard(this);
-  auto currentTime = GetTimer();
+  auto currentTime = Clock::Now();
   std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycledMap = {};
   for (auto& item : recycledResources) {
     std::vector<Resource*> needToRecycle = {};
@@ -106,7 +106,7 @@ void ResourceCache::purgeNotUsedIn(int64_t usNotUsed) {
       if (currentTime - resource->lastUsedTime < usNotUsed) {
         needToRecycle.push_back(resource);
       } else {
-        resource->onRelease(context);
+        resource->onReleaseGPU();
         delete resource;
       }
     }
@@ -178,13 +178,13 @@ void ResourceCache::removeResource(Resource* resource) {
   DEBUG_ASSERT(context->device()->contextLocked);
   RemoveFromList(nonpurgeableResources, resource);
   if (resource->recycleKey.isValid()) {
-    resource->lastUsedTime = GetTimer();
+    resource->lastUsedTime = Clock::Now();
     recycledResources[resource->recycleKey].push_back(resource);
   } else {
     purgingResource = true;
-    resource->onRelease(context);
+    resource->onReleaseGPU();
     purgingResource = false;
     delete resource;
   }
 }
-}  // namespace pag
+}  // namespace tgfx

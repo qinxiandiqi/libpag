@@ -18,21 +18,32 @@
 
 #include "Snapshot.h"
 #include "base/utils/MatrixUtil.h"
-#include "gpu/Surface.h"
 #include "rendering/caches/RenderCache.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
+
+size_t Snapshot::memoryUsage() const {
+  float bytesPerPixels;
+  if (texture->isYUV()) {
+    bytesPerPixels = 1.5f;
+  } else {
+    bytesPerPixels = texture->getSampler()->format == tgfx::PixelFormat::ALPHA_8 ? 1 : 4;
+  }
+  return static_cast<size_t>(texture->width() * texture->height() * bytesPerPixels);
+}
+
 bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
-  Point local = {x, y};
+  tgfx::Point local = {x, y};
   if (!MapPointInverted(matrix, &local)) {
     return false;
   }
-  auto surface = Surface::Make(cache->getContext(), 1, 1);
+  auto surface = tgfx::Surface::Make(cache->getContext(), 1, 1);
   if (surface == nullptr) {
     return false;
   }
   auto canvas = surface->getCanvas();
-  canvas->setMatrix(Matrix::MakeTrans(-local.x, -local.y));
+  canvas->setMatrix(tgfx::Matrix::MakeTrans(-local.x, -local.y));
   canvas->drawTexture(texture.get());
   return surface->hitTest(0, 0);
 }

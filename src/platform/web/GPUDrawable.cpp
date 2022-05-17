@@ -18,8 +18,8 @@
 
 #include "GPUDrawable.h"
 #include "base/utils/Log.h"
-#include "gpu/Surface.h"
-#include "gpu/opengl/GLDefines.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromCanvasID(const std::string& canvasID) {
@@ -40,17 +40,17 @@ void GPUDrawable::updateSize() {
   }
 }
 
-std::shared_ptr<Device> GPUDrawable::getDevice() {
+std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
   if (window == nullptr) {
-    window = WebGLWindow::MakeFrom(canvasID);
+    window = tgfx::WebGLWindow::MakeFrom(canvasID);
   }
   return window->getDevice();
 }
 
-std::shared_ptr<Surface> GPUDrawable::createSurface(Context* context) {
+std::shared_ptr<tgfx::Surface> GPUDrawable::createSurface(tgfx::Context* context) {
   return window ? window->createSurface(context) : nullptr;
 }
 }  // namespace pag

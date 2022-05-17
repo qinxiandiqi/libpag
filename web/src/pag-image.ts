@@ -1,7 +1,8 @@
-import { PAG } from './types';
+import { Matrix, PAG, PAGScaleMode } from './types';
 import { NativeImage } from './core/native-image';
-import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
+import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGImage {
   public static module: PAG;
@@ -31,15 +32,16 @@ export class PAGImage {
    * }
    * ```
    */
-  public static fromSource(source: HTMLVideoElement | HTMLImageElement): PAGImage {
+  public static fromSource(source: TexImageSource): PAGImage {
     const nativeImage = new NativeImage(source);
     const wasmIns = this.module._PAGImage._FromNativeImage(nativeImage);
     return new PAGImage(wasmIns);
   }
 
   public wasmIns;
+  public isDestroyed = false;
 
-  public constructor(wasmIns) {
+  public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
   }
   /**
@@ -55,9 +57,36 @@ export class PAGImage {
     return this.wasmIns._height() as number;
   }
   /**
+   * Returns the current scale mode. The default value is PAGScaleMode::LetterBox.
+   */
+  public scaleMode(): PAGScaleMode {
+    return this.wasmIns._scaleMode() as PAGScaleMode;
+  }
+  /**
+   * Specifies the rule of how to scale the content to fit the image layer's original size.
+   * The matrix changes when this method is called.
+   */
+  public setScaleMode(scaleMode: PAGScaleMode) {
+    this.wasmIns._setScaleMode(scaleMode);
+  }
+  /**
+   * Returns a copy of current matrix.
+   */
+  public matrix(): Matrix {
+    return this.wasmIns._matrix() as Matrix;
+  }
+  /**
+   * Set the transformation which will be applied to the content.
+   * The scaleMode property will be set to PAGScaleMode::None when this method is called.
+   */
+  public setMatrix(matrix: Matrix) {
+    this.wasmIns._setMatrix(matrix);
+  }
+  /**
    * Destroy the pag image.
    */
   public destroy(): void {
     this.wasmIns.delete();
+    this.isDestroyed = true;
   }
 }

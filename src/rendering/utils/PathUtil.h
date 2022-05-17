@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "core/Path.h"
 #include "pag/file.h"
+#include "tgfx/core/Path.h"
 
 namespace pag {
 
-Path ToPath(const PathData& pathData);
+tgfx::Path ToPath(const PathData& pathData);
 
 }  // namespace pag

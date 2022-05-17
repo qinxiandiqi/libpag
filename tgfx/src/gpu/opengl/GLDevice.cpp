@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLContext.h"
 #include "gpu/opengl/GLUtil.h"
 
-namespace pag {
+namespace tgfx {
 static std::mutex deviceMapLocker = {};
 static std::unordered_map<void*, GLDevice*> deviceMap = {};
 
@@ -66,21 +66,10 @@ bool GLDevice::onLockContext() {
     onClearCurrent();
     return false;
   }
-  auto glContext = static_cast<GLContext*>(context);
-  if (isAdopted) {
-    glContext->glState->reset();
-    glContext->glState->save();
-    // Clear externally generated GLError.
-    CheckGLError(glContext->interface.get());
-  }
   return true;
 }
 
 void GLDevice::onUnlockContext() {
-  auto glContext = static_cast<GLContext*>(context);
-  if (isAdopted) {
-    glContext->glState->restore();
-  }
   onClearCurrent();
 }
-}  // namespace pag
+}  // namespace tgfx

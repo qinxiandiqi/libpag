@@ -22,7 +22,7 @@
 
 @class PAGFont;
 
-__attribute__((visibility("default"))) @interface PAGTextLayer : PAGLayer
+PAG_API @interface PAGTextLayer : PAGLayer
 
 /**
  * Returns the TextLayer’s fill color.
@@ -73,5 +73,10 @@ __attribute__((visibility("default"))) @interface PAGTextLayer : PAGLayer
  * Set the TextLayer's text.
  */
 - (void)setText:(NSString*)text;
+
+/**
+ * Reset the text layer to its default text data.
+ */
+- (void)reset;
 
 @end

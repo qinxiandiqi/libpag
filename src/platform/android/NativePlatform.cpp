@@ -25,6 +25,7 @@
 #include "Global.h"
 #include "JNIEnvironment.h"
 #include "JTraceImage.h"
+#include "PAGText.h"
 #include "VideoSurface.h"
 
 #define LOG_TAG "libpag"
@@ -46,11 +47,12 @@ void NativePlatform::InitJNI(JNIEnv* env) {
   FontConfigAndroid::InitJNI(env);
   GPUDecoder::InitJNI(env, "org/libpag/GPUDecoder");
   VideoSurface::InitJNI(env, "org/libpag/VideoSurface");
+  InitPAGTextJNI(env);
 }
 
 std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(
-    const pag::VideoConfig& config) const {
-  auto decoder = new GPUDecoder(config);
+    const pag::VideoFormat& format) const {
+  auto decoder = new GPUDecoder(format);
   if (!decoder->isValid()) {
     delete decoder;
     return nullptr;
@@ -62,7 +64,7 @@ bool NativePlatform::registerFallbackFonts() const {
   return FontConfigAndroid::RegisterFallbackFonts();
 }
 
-void NativePlatform::traceImage(const ImageInfo& info, const void* pixels,
+void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
                                 const std::string& tag) const {
   JTraceImage::Trace(info, pixels, tag);
 }

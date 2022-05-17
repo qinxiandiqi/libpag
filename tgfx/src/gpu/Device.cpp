@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Device.h"
-#include "base/utils/Log.h"
-#include "base/utils/UniqueID.h"
-#include "gpu/Context.h"
+#include "tgfx/gpu/Device.h"
+#include "core/utils/Log.h"
+#include "core/utils/UniqueID.h"
+#include "tgfx/gpu/Context.h"
 
-namespace pag {
+namespace tgfx {
 Device::Device() : _uniqueID(UniqueID::Next()) {
 }
 
@@ -72,4 +72,4 @@ bool Device::onLockContext() {
 
 void Device::onUnlockContext() {
 }
-}  // namespace pag
+}  // namespace tgfx

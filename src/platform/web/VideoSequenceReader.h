@@ -19,24 +19,37 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "rendering/readers/SequenceReader.h"
+#include "rendering/sequences/SequenceReaderFactory.h"
 
 namespace pag {
 class VideoSequenceReader : public SequenceReader {
  public:
-  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy);
+  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence);
 
   ~VideoSequenceReader() override;
 
-  void prepareAsync(Frame targetFrame) override;
+  void prepare(Frame targetFrame) override;
 
-  std::shared_ptr<Texture> readTexture(Frame targetFrame, RenderCache* cache) override;
+ protected:
+  bool decodeFrame(Frame) override {
+    // NOP
+    return true;
+  }
+
+  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
+
+  void recordPerformance(Performance* performance, int64_t decodingTime) override;
+
+  void prepareNext(Frame) override {
+  }
 
  private:
-  Frame lastFrame = -1;
+  // Keep a reference to the File in case the Sequence object is released while we are using it.
+  std::shared_ptr<File> file = nullptr;
   emscripten::val videoReader = emscripten::val::null();
-  std::shared_ptr<Texture> texture = nullptr;
+  std::shared_ptr<tgfx::Texture> texture = nullptr;
   int32_t width = 0;
   int32_t height = 0;
+  std::unique_ptr<ByteData> mp4Data = nullptr;
 };
 }  // namespace pag

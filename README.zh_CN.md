@@ -57,17 +57,101 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 - Android 4.4 版本及以上
 - macOS 10.13 版本及以上
 - Windows 7.0 版本及以上
-- Chrome 87.0 版本及以上
-- Safari 11.1 版本及以上
+- Chrome 69.0 版本及以上
+- Safari 11.3 版本及以上
 
-## 快速开始
+## 快速接入
 
-由于大部分平台没有统一的上层业务框架，目前我们暂时只为 iOS 和 Android 定期发布预编译的二进制库，其他平台的库需要通过源 码根据自己的实际需求调整参数进行编译。移动端最新的 release
-库可以在 [这里](https://github.com/tencent/libpag/releases) 下载。 详细的 SDK
-接入文档可以参考 [SDK 接入](https://pag.io/docs/sdk.html) 。Web 平台的接入文档可以参考 [Web SDK
+由于大部分平台没有统一的上层业务框架，目前我们暂时只为 iOS, Android 和 Web 平台定期发布预编译的二进制库，其他平台的库需要通过
+源码根据自己的实际需求调整参数进行编译。移动端最新的release库可以在 [这里](https://github.com/Tencent/libpag/releases) 
+下载。 详细的 SDK接入文档可以参考 [SDK 接入](https://pag.io/docs/sdk.html) 。Web 平台的接入文档可以参考 [Web SDK
 接入](./web/README.md)
 
-API 手册：
+### iOS 端接入
+
+可以从 [release](https://github.com/Tencent/libpag/releases) 页面下载预编译的二进制库，或者通过CocoaPods接入
+
+在Podfile中添加libpag依赖:
+
+```
+pod 'libpag'
+```
+
+然后运行:
+
+```
+pod install
+```
+
+然后在项目中引入libpag的头文件
+
+```
+#import <libpag/xxx.h>
+```
+
+### Android 端接入
+
+可以从 [release](https://github.com/Tencent/libpag/releases) 页面下载预编译的 aar 库文件，或者通过 Maven 将 libpag 添加到你的项目中：
+
+编辑工程根目录下的 `build.gradle` 文件, 在`repositories`下面添加 `mavenCentral()`  :
+
+```
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:3.2.1'
+    }
+}
+```
+
+在 `app/build.gradle`中添加libpag依赖 (*`3.2.7.40` 应替换为最新发布版本*):
+
+```
+dependencies {
+    implementation 'com.tencent.tav:libpag:3.2.7.40'
+}
+```
+
+在混淆列表里面，添加libpag的keep规则
+
+```
+  -keep class org.libpag.* {*;}
+```
+
+配置完以后，sync一下，再编译即可。
+
+### Web 端接入
+
+直接拷贝如下代码，然后在浏览器中运行即可：
+
+```html
+<canvas class="canvas" id="pag"></canvas>
+<script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
+<script>
+  window.libpag.PAGInit().then((PAG) => {
+    const url = 'https://pag.io/file/like.pag';
+    fetch(url)
+      .then((response) => response.blob())
+      .then(async (blob) => {
+        const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
+        // Do Something.
+      });
+  });
+</script>
+```
+Web 端更多接入方式请参考：[Web端接入指南](https://pag.io/docs/sdk-web.html)
+
+### 范例工程
+
+我们准备了如下各端的 Demo 工程，检出对应平台的 Demo 工程可以快速开始学习如何使用 libpag 的 API：
+
+- [https://github.com/libpag/pag-ios](https://github.com/libpag/pag-ios)
+- [https://github.com/libpag/pag-android](https://github.com/libpag/pag-android)
+- [https://github.com/libpag/pag-web](https://github.com/libpag/pag-web)
+
+### API 手册：
 
 - [iOS API 参考](https://pag.io/api.html#/apis/ios/)
 - [Android API 参考](https://pag.io/api.html#/apis/android/org/libpag/package-summary.html)
@@ -77,15 +161,17 @@ API 手册：
 
 ## 开发指南
 
+**如果您希望参与到 libpag 项目的源码开发中，请务必严格按照以下步骤先配置完开发环境再进行开发和调试。**
+
 我们推荐使用 CLion 并在 macOS 平台上进行开发。
 
 ### 分支介绍
 
-main 是主要的开发分支，日常会有频繁的修改合入。main 分支稳定后会定期合入 release。release 是我们推荐的在生产环境中使用的稳定分支。
+`main` 分支是我们主要的开发分支，日常会有频繁的修改合入。`main` 分支稳定后会不定期创建发布分支 `release/{version}`。`release/` 下
+的分支是我们推荐的在生产环境中使用的稳定版本。稳定版本一旦拉取出分支后，将不再合入新功能，只做缺陷问题的修复。
 
-**注：这个仓库目前只包含最新的 PAG 4.0 版本代码。 由于 PAG 4.0 目前仍然在紧张的 Beta 开发阶段，
-因此目前还未拉出 `release` 稳定分支。如需使用稳定版本，可以从 [这里](https://github.com/tencent/libpag/releases) 下载
-PAG 3.0 版本的预编译库。另外 4.0 版本尚有一些关键的优化策略还没启用，因此性能上还没达到最优状态，请谨慎在生产环境中使用。我们正在努力让 PAG 4.0 尽快进入稳定版分支。**
+**注：这个仓库只包含从 PAG 4.0 版本开始的最新代码。PAG 3.0 及以下版本的历史记录因开源合规的要求无法对外提供，如需使用 PAG 3.0 的预编译库
+可以从 [这里](https://github.com/tencent/libpag/releases) 下载。**
 
 ### 编译环境
 
@@ -97,13 +183,16 @@ PAG 3.0 版本的预编译库。另外 4.0 版本尚有一些关键的优化策�
 
 ### 依赖管理
 
-libpag 使用 depsync 命令行工具管理第三方依赖项。如果您是在 macOS 平台上进行开发，可以直接在项目根目录下运行脚本安装所有必要工具并进行第三方仓库的同步：
+libpag 使用 depsync 命令行工具管理第三方依赖项。
+
+**macOS 平台：**
+
+直接在项目根目录下运行脚本即可安装所有必要工具并进行第三方仓库的同步：
 
 ```
 ./sync_deps.sh
 ```
-
-如果在其他平台上，请参考以下步骤进行安装必要工具并进行第三方仓库同步：
+**其他平台：**
 
 首先确保您已经安装了最新版本的 [node.js](http://nodejs.org/)，然后使用 npm 安装 depsync 命令行工具 ：
 
@@ -122,9 +211,20 @@ depsync
 ### 编译项目
 
 第三方依赖项都同步完成后，直接使用 CLion 打开项目根目录即可开始编译。若第三方依赖项发生改变，刷新 CMakeLists.txt 文件即可自动同步。
-**如果在 CMake 编译过程中遇到报错，可以尝试更新 CMake 命令行工具到最新的版本然后重新编译。**
 
-注：由于团队日常主要都在 macOS 平台上进行开发，Windows
+**macOS 平台：**
+
+不需要对 CLion 进行额外配置即可立即编译。**目前只有 macOS 平台支持自动化测试用例的运行。**
+
+**Windows 平台：**
+
+请参考以下步骤配置好 CLion 之后再进行编译：
+
+- 请确保你的 VS2019 至少同时安装了 **[使用 C++ 的桌面开发]** 和 **[通用 Windows 平台开发]** 两个子模块。
+- 在 CLion 的选项菜单里搜索 **ToolChain** ，设置默认编译工具为 **Visual Studio**，并选择 **amd64（推荐）** 或 **x86** 架构。
+
+注：**如果在 CMake 编译过程中遇到报错，可以尝试更新 CMake 命令行工具到最新的版本然后重新编译。**
+另外，由于团队日常主要都在 macOS 平台上进行开发，Windows
 平台偶尔可能会出现编译不通过的情况，如果遇到阻塞的问题欢迎通过提交 [issue](https://github.com/Tencent/libpag/issues/new/choose)
 或 [QQ](https://qm.qq.com/cgi-bin/qm/qr?k=Wa65DTnEKo2hnPsvY-1EgJOF8tvKQ-ZT&jump_from=webapi)
 群即时跟我们反馈。
@@ -132,6 +232,10 @@ depsync
 ## 协议
 
 libpag 基于 [Apache-2.0](./LICENSE.txt) 协议开源.
+
+## 隐私政策
+
+使用 libpag SDK 时请遵守 [PAG SDK个人信息保护规则](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd).
 
 ## 贡献
 

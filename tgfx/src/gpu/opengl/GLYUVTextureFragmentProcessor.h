@@ -18,10 +18,11 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLFragmentProcessor.h"
-#include "gpu/YUVTexture.h"
+#include "tgfx/gpu/YUVTexture.h"
 
-namespace pag {
+namespace tgfx {
 class GLYUVTextureFragmentProcessor : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -33,8 +34,8 @@ class GLYUVTextureFragmentProcessor : public GLFragmentProcessor {
   UniformHandle alphaStartUniform;
   UniformHandle mat3ColorConversionUniform;
 
-  Point alphaStartPrev = Point::Make(-1, -1);
-  YUVColorSpace colorSpacePrev = YUVColorSpace::Unknown;
-  YUVColorRange colorRangePrev = YUVColorRange::Unknown;
+  std::optional<Point> alphaStartPrev;
+  std::optional<YUVColorSpace> colorSpacePrev;
+  std::optional<YUVColorRange> colorRangePrev;
 };
-}  // namespace pag
+}  // namespace tgfx

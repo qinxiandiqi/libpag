@@ -19,9 +19,9 @@
 #pragma once
 
 #import <CoreVideo/CoreVideo.h>
-#include "gpu/opengl/GLYUVTexture.h"
+#include "tgfx/gpu/opengl/GLYUVTexture.h"
 
-namespace pag {
+namespace tgfx {
 class EAGLNV12Texture : public GLYUVTexture {
  public:
   static std::shared_ptr<EAGLNV12Texture> MakeFrom(Context* context, CVPixelBufferRef pixelBuffer,
@@ -36,14 +36,11 @@ class EAGLNV12Texture : public GLYUVTexture {
     return YUVPixelFormat::NV12;
   }
 
-  size_t memoryUsage() const override;
-
- protected:
-  void onRelease(Context* context) override;
-
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLESTextureRef lumaTexture = nullptr;
   CVOpenGLESTextureRef chromaTexture = nullptr;
+
+  void onReleaseGPU() override;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -10,6 +10,11 @@ export enum ErrorCode {
   ImageCodecUndefined,
   FontNamesUnloaded,
   UnsupportCanvas2D,
+  VideoElementNull,
+  CanvasIsNotFound,
+  CanvasContextIsNotWebGL,
+  PagFileDataError,
+  CanvasElementIsNoFound,
 }
 
 export const ErrorMap = {
@@ -24,4 +29,10 @@ export const ErrorMap = {
   [ErrorCode.ImageCodecUndefined]: 'Image codec instance undefined!',
   [ErrorCode.FontNamesUnloaded]: 'Target fontNames unloaded!',
   [ErrorCode.UnsupportCanvas2D]: 'Unsupport Canvas2D!',
+  [ErrorCode.VideoElementNull]: 'Video Element is null!',
+  [ErrorCode.CanvasIsNotFound]: 'Canvas is not found!',
+  [ErrorCode.CanvasContextIsNotWebGL]: 'Canvas context is not WebGL!',
+  [ErrorCode.PagFileDataError]:
+    'Initialize PAGFile data type error, please put check data type must to be File ｜ Blob | ArrayBuffer!',
+  [ErrorCode.CanvasElementIsNoFound]: 'Canvas element is not found!',
 };

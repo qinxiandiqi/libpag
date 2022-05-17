@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MotionBlurFilter.h"
-#include "gpu/opengl/GLUtil.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
@@ -82,7 +81,8 @@ static const char MOTIONBLUR_FRAGMENT_SHADER[] = R"(
         }
     )";
 
-void MotionBlurFilter::TransformBounds(Rect* bounds, const Point&, Layer* layer, Frame layerFrame) {
+void MotionBlurFilter::TransformBounds(tgfx::Rect* bounds, const tgfx::Point&, Layer* layer,
+                                       Frame layerFrame) {
   auto contentFrame = layerFrame - layer->startTime;
   auto layerCache = LayerCache::Get(layer);
   auto previousMatrix = layerCache->getTransform(contentFrame > 0 ? contentFrame - 1 : 0)->matrix;
@@ -107,7 +107,8 @@ std::string MotionBlurFilter::onBuildFragmentShader() {
   return MOTIONBLUR_FRAGMENT_SHADER;
 }
 
-void MotionBlurFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void MotionBlurFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
+  auto gl = tgfx::GLFunctions::Get(context);
   prevTransformHandle = gl->getUniformLocation(program, "uPrevTransform");
   transformHandle = gl->getUniformLocation(program, "uTransform");
   velCenterHandle = gl->getUniformLocation(program, "uVelCenter");
@@ -122,11 +123,11 @@ bool MotionBlurFilter::updateLayer(Layer* targetLayer, Frame layerFrame) {
   return previousMatrix != currentMatrix;
 }
 
-void MotionBlurFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                                      const Point&) {
+void MotionBlurFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
+                                      const tgfx::Point&) {
   auto width = static_cast<int>(contentBounds.width());
   auto height = static_cast<int>(contentBounds.height());
-  auto origin = ImageOrigin::BottomLeft;
+  auto origin = tgfx::ImageOrigin::TopLeft;
 
   previousMatrix.preTranslate(contentBounds.left, contentBounds.top);
   currentMatrix.preTranslate(contentBounds.left, contentBounds.top);
@@ -135,15 +136,16 @@ void MotionBlurFilter::onUpdateParams(const GLInterface* gl, const Rect& content
 
   auto scaling = (previousMatrix.getScaleX() != currentMatrix.getScaleX() ||
                   previousMatrix.getScaleY() != currentMatrix.getScaleY());
-
-  gl->uniformMatrix3fv(prevTransformHandle, 1, GL::FALSE, previousGLMatrix.data());
-  gl->uniformMatrix3fv(transformHandle, 1, GL::FALSE, currentGLMatrix.data());
+  auto gl = tgfx::GLFunctions::Get(context);
+  gl->uniformMatrix3fv(prevTransformHandle, 1, GL_FALSE, previousGLMatrix.data());
+  gl->uniformMatrix3fv(transformHandle, 1, GL_FALSE, currentGLMatrix.data());
   gl->uniform1f(velCenterHandle, scaling ? 0.0f : 0.5f);
   gl->uniform1f(maxDistanceHandle, (MOTION_BLUR_SCALE_FACTOR - 1.0) * 0.5f);
 }
 
-std::vector<Point> MotionBlurFilter::computeVertices(const Rect& inputBounds,
-                                                     const Rect& outputBounds, const Point&) {
+std::vector<tgfx::Point> MotionBlurFilter::computeVertices(const tgfx::Rect& inputBounds,
+                                                           const tgfx::Rect& outputBounds,
+                                                           const tgfx::Point&) {
   return ComputeVerticesForMotionBlurAndBulge(inputBounds, outputBounds);
 }
 }  // namespace pag

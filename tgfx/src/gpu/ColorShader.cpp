@@ -19,9 +19,11 @@
 #include "ColorShader.h"
 #include "gpu/ConstColorProcessor.h"
 
-namespace pag {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color4f color) {
-  return std::make_shared<ColorShader>(color);
+namespace tgfx {
+std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {
+  auto shader = std::make_shared<ColorShader>(color);
+  shader->weakThis = shader;
+  return shader;
 }
 
 bool ColorShader::isOpaque() const {
@@ -32,4 +34,4 @@ std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs
   return ConstColorProcessor::Make(color);
 }
 
-}  // namespace pag
+}  // namespace tgfx

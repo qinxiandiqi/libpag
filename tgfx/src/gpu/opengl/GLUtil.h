@@ -20,13 +20,12 @@
 
 #include <array>
 #include <string>
-
-#include "GLInterface.h"
 #include "gpu/opengl/GLContext.h"
-#include "pag/gpu.h"
-#include "pag/types.h"
+#include "tgfx/core/ImageOrigin.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/gpu/opengl/GLSampler.h"
 
-namespace pag {
+namespace tgfx {
 struct GLVersion {
   int majorVersion = -1;
   int minorVersion = -1;
@@ -39,24 +38,14 @@ struct GLVersion {
 
 GLVersion GetGLVersion(const char* versionString);
 
-unsigned CreateProgram(const GLInterface* gl, const std::string& vertex,
-                       const std::string& fragment);
+unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment);
 
-unsigned LoadShader(const GLInterface* gl, unsigned shaderType, const std::string& source);
+unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& source);
 
-bool CheckGLError(const GLInterface* gl);
+bool CheckGLError(Context* context);
 
-bool CreateTexture(const GLInterface* gl, int width, int height, GLTextureInfo* texture);
-
-void ActiveTexture(const GLInterface* gl, unsigned textureUnit, unsigned target, unsigned textureID,
-                   PixelConfig pixelConfig = PixelConfig::RGBA_8888);
-
-void SubmitTexture(const GLInterface* gl, const GLTextureInfo& glInfo, const TextureFormat& format,
-                   int width, int height, size_t rowBytes, int bytesPerPixel, void* pixels);
+void SubmitGLTexture(Context* context, const GLSampler& sampler, int width, int height,
+                     size_t rowBytes, int bytesPerPixel, void* pixels);
 
 std::array<float, 9> ToGLMatrix(const Matrix& matrix);
-std::array<float, 9> ToGLVertexMatrix(const Matrix& matrix, int width, int height,
-                                      ImageOrigin origin);
-std::array<float, 9> ToGLTextureMatrix(const Matrix& matrix, int width, int height,
-                                       ImageOrigin origin);
-}  // namespace pag
+}  // namespace tgfx

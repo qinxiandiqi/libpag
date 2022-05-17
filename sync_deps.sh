@@ -29,3 +29,5 @@ for TOOL in ${NODE_REQUIRED_TOOLS[@]}; do
 done
 
 depsync
+git lfs prune
+git lfs pull

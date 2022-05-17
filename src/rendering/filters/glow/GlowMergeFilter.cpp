@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlowMergeFilter.h"
-#include "gpu/opengl/GLUtil.h"
 
 namespace pag {
 static const char GLOW_TARGET_FRAGMENT_SHADER[] = R"(
@@ -50,24 +49,27 @@ std::string GlowMergeFilter::onBuildFragmentShader() {
   return GLOW_TARGET_FRAGMENT_SHADER;
 }
 
-void GlowMergeFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void GlowMergeFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
+  auto gl = tgfx::GLFunctions::Get(context);
   inputTextureHandle = gl->getUniformLocation(program, "inputImageTexture");
   blurTextureHandle = gl->getUniformLocation(program, "blurImageTexture");
   progressHandle = gl->getUniformLocation(program, "progress");
 }
 
-void GlowMergeFilter::updateTexture(unsigned blurTexture) {
-  blurTextureID = blurTexture;
+void GlowMergeFilter::updateTexture(const tgfx::GLSampler& sampler) {
+  blurTexture = sampler;
 }
 
-void GlowMergeFilter::onUpdateParams(const GLInterface* gl, const Rect&, const Point&) {
+void GlowMergeFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&,
+                                     const tgfx::Point&) {
   auto glowEffect = static_cast<GlowEffect*>(effect);
   auto glowThreshold = glowEffect->glowThreshold->getValueAt(layerFrame);
+  auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform1f(progressHandle, glowThreshold);
   gl->uniform1i(inputTextureHandle, 0);
   // TODO(domrjchen): 下面这行之前写成了 gl->uniform1i(progressHandle, 1), 会导致 glError,
   // 暂时注释掉。目前的发光效果跟 AE 也没有对齐，后面重写发光效果时时再修复。
   //  gl->uniform1i(blurTextureHandle, 1);
-  ActiveTexture(gl, GL::TEXTURE1, GL::TEXTURE_2D, blurTextureID);
+  ActiveGLTexture(context, 1, &blurTexture);
 }
 }  // namespace pag

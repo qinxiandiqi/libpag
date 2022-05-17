@@ -1,6 +1,7 @@
-import { PAG } from './types';
-import { wasmAwaitRewind } from './utils/decorators';
+import { AlphaType, ColorType, PAG } from './types';
+import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGSurface {
   public static module: PAG;
@@ -21,8 +22,9 @@ export class PAGSurface {
   }
 
   public wasmIns;
+  public isDestroyed = false;
 
-  public constructor(wasmIns) {
+  public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
   }
   /**
@@ -43,8 +45,39 @@ export class PAGSurface {
   public updateSize(): void {
     this.wasmIns._updateSize();
   }
+  /**
+   * Erases all pixels of this surface with transparent color. Returns true if the content has
+   * changed.
+   */
+  public clearAll(): boolean {
+    return this.wasmIns._clearAll() as boolean;
+  }
+  /**
+   * Free the cache created by the surface immediately. Can be called to reduce memory pressure.
+   */
+  public freeCache(): void {
+    this.wasmIns._freeCache();
+  }
+  /**
+   * Copies pixels from current PAGSurface to dstPixels with specified color type, alpha type and
+   * row bytes. Returns true if pixels are copied to dstPixels.
+   */
+  public readPixels(colorType: ColorType, alphaType: AlphaType): Uint8Array | null {
+    if (colorType === ColorType.Unknown) return null;
+    const rowBytes = this.width() * (colorType === ColorType.ALPHA_8 ? 1 : 4);
+    const length = rowBytes * this.height();
+    const dataUint8Array = new Uint8Array(length);
+    const numBytes = dataUint8Array.byteLength * dataUint8Array.BYTES_PER_ELEMENT;
+    const dataPtr = PAGSurface.module._malloc(numBytes);
+    const dataOnHeap = new Uint8Array(PAGSurface.module.HEAPU8.buffer, dataPtr, numBytes);
+    const res = this.wasmIns._readPixels(colorType, alphaType, dataPtr, rowBytes) as boolean;
+    dataUint8Array.set(dataOnHeap);
+    PAGSurface.module._free(dataPtr);
+    return res ? dataUint8Array : null;
+  }
 
   public destroy(): void {
     this.wasmIns.delete();
+    this.isDestroyed = true;
   }
 }

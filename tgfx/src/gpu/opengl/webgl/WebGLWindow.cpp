@@ -16,11 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/webgl/WebGLWindow.h"
-#include "base/utils/Log.h"
-#include "gpu/opengl/GLDefines.h"
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "core/utils/Log.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID) {
   if (canvasID.empty()) {
     return nullptr;
@@ -45,10 +46,11 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
     LOGE("WebGLWindow::onCreateSurface() Can not create a Surface with zero size.");
     return nullptr;
   }
-  GLFrameBufferInfo glInfo = {};
+  GLFrameBuffer glInfo = {};
   glInfo.id = 0;
-  glInfo.format = GL::RGBA8;
-  BackendRenderTarget renderTarget(glInfo, width, height);
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  glInfo.format = PixelFormat::RGBA_8888;
+  auto renderTarget =
+      GLRenderTarget::MakeFrom(context, glInfo, width, height, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(renderTarget);
 }
-}  // namespace pag
+}  // namespace tgfx

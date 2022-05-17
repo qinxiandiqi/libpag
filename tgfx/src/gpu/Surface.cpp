@@ -16,10 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Surface.h"
+#include "tgfx/gpu/Surface.h"
+#include "core/utils/Log.h"
 
-namespace pag {
+namespace tgfx {
 Surface::Surface(Context* context) : context(context) {
+  DEBUG_ASSERT(context != nullptr);
 }
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) const {
@@ -32,4 +34,4 @@ bool Surface::hitTest(float x, float y) const {
   auto result = onReadPixels(info, pixel, static_cast<int>(x), static_cast<int>(y));
   return result && pixel[3] > 0;
 }
-}  // namespace pag
+}  // namespace tgfx

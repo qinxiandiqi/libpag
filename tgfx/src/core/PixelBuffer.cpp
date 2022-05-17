@@ -16,12 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PixelBuffer.h"
-#include "core/Bitmap.h"
-#include "gpu/Device.h"
-#include "platform/Platform.h"
+#include "tgfx/core/PixelBuffer.h"
+#include "tgfx/gpu/Device.h"
 
-namespace pag {
+namespace tgfx {
 class RasterPixelBuffer : public PixelBuffer {
  public:
   RasterPixelBuffer(const ImageInfo& info, uint8_t* pixels) : PixelBuffer(info), _pixels(pixels) {
@@ -79,9 +77,4 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   }
   return std::shared_ptr<RasterPixelBuffer>(new RasterPixelBuffer(info, pixels));
 }
-
-void Trace(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& tag) {
-  Bitmap bitmap(pixelBuffer);
-  Trace(bitmap, tag);
-}
-}  // namespace pag
+}  // namespace tgfx

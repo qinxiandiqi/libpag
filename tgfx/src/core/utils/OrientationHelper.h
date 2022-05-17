@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "core/Orientation.h"
+#include "tgfx/core/Orientation.h"
 
-namespace pag {
+namespace tgfx {
 /*
  * @param data           Buffer to read bytes from
  * @param isLittleEndian Output parameter
@@ -97,4 +97,4 @@ static bool is_orientation_marker(const uint8_t* data, size_t data_length,
   return false;
 }
 
-}  // namespace pag
+}  // namespace tgfx

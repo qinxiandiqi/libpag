@@ -18,9 +18,10 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLGeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLEllipseGeometryProcessor : public GLGeometryProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -32,8 +33,8 @@ class GLEllipseGeometryProcessor : public GLGeometryProcessor {
   UniformHandle viewMatrixUniform;
   UniformHandle screenSizeUniform;
 
-  Matrix viewMatrixPrev = Matrix::Invalid();
-  int widthPrev = -1;
-  int heightPrev = -1;
+  std::optional<Matrix> viewMatrixPrev;
+  std::optional<int> widthPrev;
+  std::optional<int> heightPrev;
 };
-}  // namespace pag
+}  // namespace tgfx

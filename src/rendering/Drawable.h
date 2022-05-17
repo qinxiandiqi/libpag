@@ -18,14 +18,47 @@
 
 #pragma once
 
-#include "gpu/Surface.h"
-#include "pag/pag.h"
+#include "pag/gpu.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
+
+class Drawable {
+ public:
+  virtual ~Drawable() = default;
+
+  virtual int width() const = 0;
+
+  virtual int height() const = 0;
+
+  virtual void updateSize() = 0;
+
+  virtual std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) = 0;
+
+  virtual void present(tgfx::Context* context) = 0;
+
+  virtual void setTimeStamp(int64_t) {
+  }
+
+  virtual tgfx::Context* lockContext();
+
+  virtual void unlockContext();
+
+  virtual bool prepareDevice();
+
+  virtual void freeDevice();
+
+ protected:
+  virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
+
+ private:
+  std::shared_ptr<tgfx::Device> currentDevice;
+};
+
 class RenderTargetDrawable : public Drawable {
  public:
-  RenderTargetDrawable(std::shared_ptr<Device> device, const BackendRenderTarget& renderTarget,
-                       ImageOrigin origin);
+  RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
+                       const BackendRenderTarget& renderTarget, tgfx::ImageOrigin origin);
 
   int width() const override {
     return renderTarget.width();
@@ -38,25 +71,25 @@ class RenderTargetDrawable : public Drawable {
   void updateSize() override {
   }
 
-  std::shared_ptr<Device> getDevice() override {
+  std::shared_ptr<tgfx::Device> getDevice() override {
     return device;
   }
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
-  void present(Context*) override {
+  void present(tgfx::Context*) override {
   }
 
  private:
-  std::shared_ptr<Device> device = nullptr;
+  std::shared_ptr<tgfx::Device> device = nullptr;
   BackendRenderTarget renderTarget = {};
-  ImageOrigin origin = ImageOrigin::TopLeft;
+  tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
 };
 
 class TextureDrawable : public Drawable {
  public:
-  TextureDrawable(std::shared_ptr<Device> device, const BackendTexture& texture,
-                  ImageOrigin origin);
+  TextureDrawable(std::shared_ptr<tgfx::Device> device, const BackendTexture& texture,
+                  tgfx::ImageOrigin origin);
 
   int width() const override {
     return texture.width();
@@ -69,24 +102,24 @@ class TextureDrawable : public Drawable {
   void updateSize() override {
   }
 
-  std::shared_ptr<Device> getDevice() override {
+  std::shared_ptr<tgfx::Device> getDevice() override {
     return device;
   }
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
-  void present(Context*) override {
+  void present(tgfx::Context*) override {
   }
 
  private:
-  std::shared_ptr<Device> device = nullptr;
+  std::shared_ptr<tgfx::Device> device = nullptr;
   BackendTexture texture = {};
-  ImageOrigin origin = ImageOrigin::TopLeft;
+  tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
 };
 
 class OffscreenDrawable : public Drawable {
  public:
-  OffscreenDrawable(int width, int height, std::shared_ptr<Device> device);
+  OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
 
   int width() const override {
     return _width;
@@ -99,18 +132,18 @@ class OffscreenDrawable : public Drawable {
   void updateSize() override {
   }
 
-  std::shared_ptr<Device> getDevice() override {
+  std::shared_ptr<tgfx::Device> getDevice() override {
     return device;
   }
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
-  void present(Context*) override {
+  void present(tgfx::Context*) override {
   }
 
  private:
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<Device> device = nullptr;
+  std::shared_ptr<tgfx::Device> device = nullptr;
 };
 }  // namespace pag

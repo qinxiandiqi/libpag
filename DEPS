@@ -7,12 +7,12 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "9b28c43638b358c05a0a9c26042390e86d1a213d",
+        "commit": "35ae472eda88c655e78642967ddc792b4fc23222",
         "dir": "vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "e8ba79d59c62c23669a7df0a213664239069413f",
+        "commit": "f0c4736442a8e640e7f7978b6b9ed322148245bb",
         "dir": "third_party/pathkit"
       },
       {

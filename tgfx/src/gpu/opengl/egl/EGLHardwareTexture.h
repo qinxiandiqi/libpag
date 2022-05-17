@@ -22,18 +22,14 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include "gpu/opengl/GLTexture.h"
 #include "platform/android/HardwareBufferInterface.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
-namespace pag {
+namespace tgfx {
 class EGLHardwareTexture : public GLTexture {
  public:
   static std::shared_ptr<EGLHardwareTexture> MakeFrom(Context* context,
                                                       AHardwareBuffer* hardwareBuffer);
-
-  size_t memoryUsage() const override {
-    return 0;
-  }
 
  private:
   AHardwareBuffer* hardwareBuffer = nullptr;
@@ -45,8 +41,8 @@ class EGLHardwareTexture : public GLTexture {
 
   ~EGLHardwareTexture() override;
 
-  void onRelease(Context* context) override;
+  void onReleaseGPU() override;
 };
-}  // namespace pag
+}  // namespace tgfx
 
 #endif

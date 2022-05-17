@@ -19,16 +19,16 @@
 #pragma once
 
 #include "GLInterface.h"
-#include "GLState.h"
-#include "gpu/Context.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/opengl/GLSampler.h"
 
-namespace pag {
+namespace tgfx {
 class GLCaps;
 
 class GLContext : public Context {
  public:
-  static const GLInterface* Unwrap(Context* context) {
-    return context ? static_cast<GLContext*>(context)->interface.get() : nullptr;
+  static GLContext* Unwrap(Context* context) {
+    return static_cast<GLContext*>(context);
   }
 
   GLContext(Device* device, const GLInterface* glInterface);
@@ -37,15 +37,22 @@ class GLContext : public Context {
     return Backend::OPENGL;
   }
 
-  const Caps* caps() const override {
-    return interface->caps.get();
+  const GLFunctions* functions() const {
+    return glInterface->functions.get();
   }
 
- private:
-  std::unique_ptr<const GLInterface> interface = nullptr;
-  std::unique_ptr<GLState> glState = nullptr;
+  const Caps* caps() const override {
+    return glInterface->caps.get();
+  }
 
-  friend class GLStateGuard;
+  void resetState() override;
+
+  void bindTexture(int unitIndex, const TextureSampler* sampler);
+
+ private:
+  const GLInterface* glInterface = nullptr;
+
   friend class GLDevice;
+  friend class GLInterface;
 };
-}  // namespace pag
+}  // namespace tgfx

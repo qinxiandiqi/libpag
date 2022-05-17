@@ -31,10 +31,10 @@ class MotionTileFilter : public LayerFilter {
 
   std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
+                      const tgfx::Point& filterScale) override;
 
  private:
   Effect* effect = nullptr;

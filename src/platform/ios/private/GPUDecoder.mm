@@ -20,15 +20,14 @@
 #include "VideoImage.h"
 #include "base/utils/USE.h"
 
-#define DEFAULT_MAX_NUM_REORDER 4
-
 namespace pag {
 
-GPUDecoder::GPUDecoder(const VideoConfig& config)
-    : sourceColorSpace(config.colorSpace),
-      destinationColorSpace(config.colorSpace),
-      colorRange(config.colorRange) {
-  isInitialized = initVideoToolBox(config.headers, config.mimeType);
+GPUDecoder::GPUDecoder(const VideoFormat& format)
+    : sourceColorSpace(format.colorSpace),
+      destinationColorSpace(format.colorSpace),
+      colorRange(format.colorRange),
+      maxNumReorder(format.maxReorderSize) {
+  isInitialized = initVideoToolBox(format.headers, format.mimeType);
 }
 
 GPUDecoder::~GPUDecoder() {
@@ -81,35 +80,26 @@ void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfo
   }
 }
 
-void initParameterSets(const std::vector<std::shared_ptr<ByteData>>& headers,
-                       uint8_t** parameterSetPointers, size_t* parameterSetSizes) {
-  int index = 0;
-  for (const auto& header : headers) {
-    parameterSetPointers[index] = header->data() + 4;
-    parameterSetSizes[index] = header->length() - 4;
-    index++;
-  }
-}
-
-bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<ByteData>>& headers,
+bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
                                   const std::string& mimeType) {
   if (videoFormatDescription == nullptr) {
     OSStatus status;
     int size = static_cast<int>(headers.size());
-    uint8_t** parameterSetPointers = new uint8_t*[size]();
-    size_t* parameterSetSizes = new size_t[size];
-    initParameterSets(headers, parameterSetPointers, parameterSetSizes);
+    std::vector<const uint8_t*> parameterSetPointers = {};
+    std::vector<size_t> parameterSetSizes = {};
+    for (const auto& header : headers) {
+      parameterSetPointers.push_back(header->bytes() + 4);
+      parameterSetSizes.push_back(header->size() - 4);
+    }
 
     if (mimeType == "video/hevc") {
       if (@available(iOS 11.0, *)) {
         status = CMVideoFormatDescriptionCreateFromHEVCParameterSets(
-            kCFAllocatorDefault, size, parameterSetPointers, parameterSetSizes, 4, NULL,
+            kCFAllocatorDefault, size, &parameterSetPointers[0], &parameterSetSizes[0], 4, NULL,
             &videoFormatDescription);
       } else {
         status = -1;
       }
-      delete[] parameterSetPointers;
-      delete[] parameterSetSizes;
       if (status != noErr) {
         LOGE("GPUDecoder:format description create failed status = %d", status);
         return false;
@@ -118,19 +108,15 @@ bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<ByteData>>& 
       // create video format description
       status = CMVideoFormatDescriptionCreateFromH264ParameterSets(kCFAllocatorDefault,
                                                                    size,  // param count
-                                                                   parameterSetPointers,
-                                                                   parameterSetSizes,
+                                                                   &parameterSetPointers[0],
+                                                                   &parameterSetSizes[0],
                                                                    4,  // nal start code size
                                                                    &videoFormatDescription);
-      delete[] parameterSetPointers;
-      delete[] parameterSetSizes;
       if (status != noErr) {
         LOGE("GPUDecoder:format description create failed status = %d", status);
         return false;
       }
     }
-    maxNumReorder = DEFAULT_MAX_NUM_REORDER;
-
     return resetVideoToolBox();
   }
   return true;
@@ -150,7 +136,7 @@ bool GPUDecoder::resetVideoToolBox() {
                         kCVPixelBufferIOSurfacePropertiesKey};
 
   uint32_t openGLESCompatibility = true;
-  uint32_t pixelFormatType = colorRange == YUVColorRange::JPEG
+  uint32_t pixelFormatType = colorRange == tgfx::YUVColorRange::JPEG
                                  ? kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
                                  : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
 
@@ -178,7 +164,7 @@ bool GPUDecoder::resetVideoToolBox() {
   CFRelease(ioSurfaceParam);
 
   if (@available(iOS 10.0, *)) {
-    if (sourceColorSpace == YUVColorSpace::Rec2020) {
+    if (sourceColorSpace == tgfx::YUVColorSpace::Rec2020) {
       CFStringRef destinationColorPrimaries = CFStringCreateWithCString(
           kCFAllocatorDefault, "DestinationColorPrimaries", kCFStringEncodingUTF8);
       CFStringRef destinationTransferFunction = CFStringCreateWithCString(
@@ -203,7 +189,7 @@ bool GPUDecoder::resetVideoToolBox() {
       CFRelease(destinationYCbCrMatrix);
       CFRelease(pixelTransferProperties);
 
-      destinationColorSpace = YUVColorSpace::Rec709;
+      destinationColorSpace = tgfx::YUVColorSpace::Rec709;
     }
   }
 
@@ -288,11 +274,11 @@ pag::DecodingResult GPUDecoder::onDecodeFrame() {
   }
 
   if (outputPixelBuffer) {
-    OutputFrame* outputFrame = new OutputFrame();
-    outputFrame->frameTime = sendFrameTime;
-    outputFrame->outputPixelBuffer = outputPixelBuffer;
+    auto newFrame = new OutputFrame();
+    newFrame->frameTime = sendFrameTime;
+    newFrame->outputPixelBuffer = outputPixelBuffer;
     outputPixelBuffer = nullptr;
-    outputFrameCaches.insert(std::pair<pag::Frame, OutputFrame*>(sendFrameTime, outputFrame));
+    outputFrameCaches.insert(std::pair<pag::Frame, OutputFrame*>(sendFrameTime, newFrame));
   }
 
   if (!inputEndOfStream && pendingFrames.size() <= static_cast<size_t>(maxNumReorder)) {

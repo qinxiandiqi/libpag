@@ -17,11 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DisplacementMapFilter.h"
-#include "gpu/Surface.h"
-#include "gpu/opengl/GLUtil.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -55,8 +54,7 @@ static const char FRAGMENT_SHADER[] = R"(
             } else if (uDisplacementMapBehavior == 2) {
                 mapVertexColor = fract(vertexColor / mapTextureSize);
             }
-            // 之前外部生成的纹理错误的使用了 top-left 的朝向，现在外部修正了，这里对应要临时改一下，之后再整体修改。
-            mapVertexColor = vec2(mapVertexColor.x, 1.0 - mapVertexColor.y);
+            mapVertexColor = vec2(mapVertexColor.x, mapVertexColor.y);
 
             vec4 mapColor = mix(grayColor, texture2D(mapTexture, mapVertexColor), EdgeDetect(mapVertexColor));
 
@@ -97,7 +95,8 @@ std::string DisplacementMapFilter::onBuildFragmentShader() {
   return FRAGMENT_SHADER;
 }
 
-void DisplacementMapFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void DisplacementMapFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
+  auto gl = tgfx::GLFunctions::Get(context);
   useForDisplacementHandle = gl->getUniformLocation(program, "uUseForDisplacement");
   maxDisplacementHandle = gl->getUniformLocation(program, "uMaxDisplacement");
   displacementMapBehaviorHandle = gl->getUniformLocation(program, "uDisplacementMapBehavior");
@@ -108,21 +107,21 @@ void DisplacementMapFilter::onPrepareProgram(const GLInterface* gl, unsigned int
 }
 
 void DisplacementMapFilter::updateMapTexture(RenderCache* cache, const Graphic* mapGraphic,
-                                             const Rect& bounds) {
+                                             const tgfx::Rect& bounds) {
   if (mapSurface == nullptr || mapBounds.width() != bounds.width() ||
       mapBounds.height() != bounds.height()) {
-    mapSurface = Surface::Make(cache->getContext(), static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()));
+    mapSurface = tgfx::Surface::Make(cache->getContext(), static_cast<int>(bounds.width()),
+                                     static_cast<int>(bounds.height()));
     mapBounds = bounds;
   }
   mapGraphic->draw(mapSurface->getCanvas(), cache);
 }
 
-void DisplacementMapFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                                           const Point&) {
+void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
+                                           const tgfx::Point&) {
   auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
-  auto mapTexture = GLTexture::Unwrap(mapSurface->getTexture().get());
-  ActiveTexture(gl, GL::TEXTURE1, GL::TEXTURE_2D, mapTexture.id);
+  ActiveGLTexture(context, 1, mapSurface->getTexture()->getSampler());
+  auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform2f(useForDisplacementHandle,
                 pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
                 pagEffect->useForVerticalDisplacement->getValueAt(layerFrame));

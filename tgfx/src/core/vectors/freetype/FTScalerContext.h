@@ -23,9 +23,9 @@
 #include FT_FREETYPE_H
 #include "FTFace.h"
 #include "FTTypeface.h"
-#include "core/PixelBuffer.h"
+#include "tgfx/core/PixelBuffer.h"
 
-namespace pag {
+namespace tgfx {
 class FTScalerContextRec {
  public:
   bool computeMatrices(Point* scale, Matrix* remaining) const;
@@ -77,4 +77,4 @@ class FTScalerContext {
   Point scale = Point::Make(1.f, 1.f);
   FT_Int32 loadGlyphFlags = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

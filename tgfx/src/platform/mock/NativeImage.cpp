@@ -18,7 +18,7 @@
 
 #include "platform/NativeCodec.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<Image> NativeCodec::MakeImage(const std::string&) {
   return nullptr;
 }
@@ -26,4 +26,8 @@ std::shared_ptr<Image> NativeCodec::MakeImage(const std::string&) {
 std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data>) {
   return nullptr;
 }
-}  // namespace pag
+
+std::shared_ptr<Image> NativeCodec::MakeFrom(void* /*nativeImage*/) {
+  return nullptr;
+}
+}  // namespace tgfx

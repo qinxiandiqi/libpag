@@ -18,17 +18,19 @@
 
 #pragma once
 
-#include "GLInterface.h"
+#include "GLContext.h"
 #include "gpu/ProgramDataManager.h"
 
-namespace pag {
+namespace tgfx {
 class GLProgramDataManager : public ProgramDataManager {
  public:
-  GLProgramDataManager(const GLInterface* gl, const std::vector<int>* uniforms);
+  GLProgramDataManager(Context* context, const std::vector<int>* uniforms);
 
   void set1f(UniformHandle handle, float v0) const override;
 
   void set2f(UniformHandle handle, float v0, float v1) const override;
+
+  void set4f(UniformHandle handle, float v0, float v1, float v2, float v3) const override;
 
   void set4fv(UniformHandle handle, int arrayCount, const float* v) const override;
 
@@ -37,7 +39,7 @@ class GLProgramDataManager : public ProgramDataManager {
   void setMatrix(UniformHandle u, const Matrix& matrix) const override;
 
  private:
-  const GLInterface* gl;
+  const GLFunctions* gl;
   const std::vector<int>* uniforms;
 };
-}  // namespace pag
+}  // namespace tgfx

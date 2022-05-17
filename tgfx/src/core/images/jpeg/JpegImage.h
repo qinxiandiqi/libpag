@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "core/Image.h"
+#include "tgfx/core/Image.h"
 
-namespace pag {
+namespace tgfx {
 class JpegImage : public Image {
  public:
   static std::shared_ptr<Image> MakeFrom(const std::string& filePath);
@@ -49,4 +49,4 @@ class JpegImage : public Image {
   }
 };
 
-}  // namespace pag
+}  // namespace tgfx

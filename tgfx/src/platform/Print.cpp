@@ -18,11 +18,11 @@
 
 #if !defined(__ANDROID__) && !defined(ANDROID)
 
-#include "platform/Print.h"
+#include "tgfx/platform/Print.h"
 #include <cstdarg>
 #include <cstdio>
 
-namespace pag {
+namespace tgfx {
 void PrintLog(const char format[], ...) {
   va_list args;
   va_start(args, format);
@@ -38,6 +38,6 @@ void PrintError(const char format[], ...) {
   va_end(args);
   fprintf(stderr, "\n");
 }
-}  // namespace pag
+}  // namespace tgfx
 
 #endif

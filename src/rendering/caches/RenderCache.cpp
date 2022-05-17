@@ -18,13 +18,12 @@
 
 #include "RenderCache.h"
 #include <functional>
-#include <map>
 #include "base/utils/TimeUtil.h"
-#include "base/utils/USE.h"
 #include "base/utils/UniqueID.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。
@@ -33,29 +32,32 @@ namespace pag {
 #define PURGEABLE_EXPIRED_FRAME 10
 #define SCALE_FACTOR_PRECISION 0.001f
 #define DECODING_VISIBLE_DISTANCE 500000  // 提前 500ms 秒开始解码。
-#define MIN_HARDWARE_PREPARE_TIME 100000  // 距离当前时刻小于100ms的视频启动软解转硬解优化。
 
 class ImageTask : public Executor {
  public:
-  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<Image> image) {
+  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<tgfx::Image> image,
+                                          std::shared_ptr<File> file) {
     if (image == nullptr) {
       return nullptr;
     }
-    auto bitmap = new ImageTask(std::move(image));
+    auto bitmap = new ImageTask(std::move(image), file);
     auto task = Task::Make(std::unique_ptr<ImageTask>(bitmap));
     task->run();
     return task;
   }
 
-  std::shared_ptr<TextureBuffer> getBuffer() const {
+  std::shared_ptr<tgfx::TextureBuffer> getBuffer() const {
     return buffer;
   }
 
  private:
-  std::shared_ptr<TextureBuffer> buffer = {};
-  std::shared_ptr<Image> image = nullptr;
+  std::shared_ptr<tgfx::TextureBuffer> buffer = {};
+  std::shared_ptr<tgfx::Image> image = nullptr;
+  // Make a reference to file when image made from imageByte of file.
+  std::shared_ptr<File> file = nullptr;
 
-  explicit ImageTask(std::shared_ptr<Image> image) : image(std::move(image)) {
+  explicit ImageTask(std::shared_ptr<tgfx::Image> image, std::shared_ptr<File> file)
+      : image(std::move(image)), file(std::move(file)) {
   }
 
   void execute() override {
@@ -87,13 +89,29 @@ void RenderCache::setVideoEnabled(bool value) {
 }
 
 bool RenderCache::initFilter(Filter* filter) {
-  auto startTime = GetTimer();
+  tgfx::Clock clock = {};
   auto result = filter->initialize(getContext());
-  programCompilingTime += GetTimer() - startTime;
+  programCompilingTime += clock.measure();
   return result;
 }
 
-void RenderCache::preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy policy) {
+void RenderCache::prepareLayers() {
+#ifndef PAG_BUILD_FOR_WEB
+  // There is no multiple-thread support on the web platform.
+  auto layerDistances = stage->findNearlyVisibleLayersIn(DECODING_VISIBLE_DISTANCE);
+  for (auto& item : layerDistances) {
+    for (auto pagLayer : item.second) {
+      if (pagLayer->layerType() == LayerType::PreCompose) {
+        preparePreComposeLayer(static_cast<PreComposeLayer*>(pagLayer->layer));
+      } else if (pagLayer->layerType() == LayerType::Image) {
+        prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer));
+      }
+    }
+  }
+#endif
+}
+
+void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   auto composition = layer->composition;
   if (composition->type() != CompositionType::Video &&
       composition->type() != CompositionType::Bitmap) {
@@ -107,31 +125,38 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy 
   if (compositionFrame < 0) {
     compositionFrame = 0;
   }
-  auto sequence = Sequence::Get(composition);
-  auto sequenceFrame = sequence->toSequenceFrame(compositionFrame);
-  if (prepareSequenceReader(sequence, sequenceFrame, policy)) {
+  auto assetID = composition->uniqueID;
+  usedAssets.insert(assetID);
+  if (composition->staticContent() && hasSnapshot(assetID)) {
+    // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
     return;
   }
-  auto result = sequenceCaches.find(composition->uniqueID);
+  auto sequence = Sequence::Get(composition);
+  auto targetFrame = sequence->toSequenceFrame(compositionFrame);
+  auto result = sequenceCaches.find(assetID);
   if (result != sequenceCaches.end()) {
-    // 循环预测
-    result->second->prepareAsync(sequenceFrame);
+    // 更新循环预测起点。
+    result->second->pendingFirstFrame = targetFrame;
+    return;
+  }
+  SequenceReaderFactory factory(sequence);
+  auto reader = getSequenceReaderInternal(&factory);
+  if (reader) {
+    reader->prepare(targetFrame);
   }
 }
 
 void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
+  std::shared_ptr<Graphic> graphic = nullptr;
   auto pagImage = static_cast<PAGImageLayer*>(pagLayer)->getPAGImage();
-  if (pagImage == nullptr) {
+  if (pagImage != nullptr) {
+    graphic = pagImage->getGraphic();
+  } else {
     auto imageBytes = static_cast<ImageLayer*>(pagLayer->layer)->imageBytes;
-    auto image = ImageContentCache::GetImage(imageBytes);
-    if (image) {
-      prepareImage(imageBytes->uniqueID, image);
-    }
-    return;
+    graphic = ImageContentCache::GetGraphic(imageBytes);
   }
-  auto image = pagImage->getImage();
-  if (image) {
-    prepareImage(pagImage->uniqueID(), image);
+  if (graphic) {
+    graphic->prepare(this);
   }
 }
 
@@ -159,24 +184,12 @@ void RenderCache::setSnapshotEnabled(bool value) {
   clearAllSnapshots();
 }
 
-void RenderCache::prepareFrame() {
+void RenderCache::beginFrame() {
   usedAssets = {};
   resetPerformance();
-  auto layerDistances = stage->findNearlyVisibleLayersIn(DECODING_VISIBLE_DISTANCE);
-  for (auto& item : layerDistances) {
-    for (auto pagLayer : item.second) {
-      if (pagLayer->layerType() == LayerType::PreCompose) {
-        auto policy = item.first < MIN_HARDWARE_PREPARE_TIME ? DecodingPolicy::SoftwareToHardware
-                                                             : DecodingPolicy::Hardware;
-        preparePreComposeLayer(static_cast<PreComposeLayer*>(pagLayer->layer), policy);
-      } else if (pagLayer->layerType() == LayerType::Image) {
-        prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer));
-      }
-    }
-  }
 }
 
-void RenderCache::attachToContext(Context* current, bool forHitTest) {
+void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
   if (deviceID > 0 && deviceID != current->device()->uniqueID()) {
     // Context 改变需要清理内部所有缓存，这里用 uniqueID
     // 而不用指针比较，是因为指针析构后再创建可能会地址重合。
@@ -194,11 +207,13 @@ void RenderCache::attachToContext(Context* current, bool forHitTest) {
     imageTasks.erase(assetID);
     clearSequenceCache(assetID);
     clearFilterCache(assetID);
+    removeTextAtlas(assetID);
   }
 }
 
 void RenderCache::releaseAll() {
   clearAllSnapshots();
+  clearAllTextAtlas();
   graphicsMemory = 0;
   clearAllSequenceCaches();
   for (auto& item : filterCaches) {
@@ -218,7 +233,7 @@ void RenderCache::detachFromContext() {
   clearExpiredSequences();
   clearExpiredBitmaps();
   clearExpiredSnapshots();
-  auto currentTimestamp = GetTimer();
+  auto currentTimestamp = tgfx::Clock::Now();
   context->purgeResourcesNotUsedIn(currentTimestamp - lastTimestamp);
   lastTimestamp = currentTimestamp;
   context = nullptr;
@@ -287,6 +302,54 @@ void RenderCache::removeSnapshot(ID assetID) {
   snapshotCaches.erase(assetID);
 }
 
+TextAtlas* RenderCache::getTextAtlas(ID assetID) const {
+  auto textAtlas = textAtlases.find(assetID);
+  if (textAtlas == textAtlases.end()) {
+    return nullptr;
+  }
+  return textAtlas->second;
+}
+
+TextAtlas* RenderCache::getTextAtlas(const TextGlyphs* textGlyphs) {
+  auto maxScaleFactor = stage->getAssetMaxScale(textGlyphs->assetID());
+  auto textAtlas = getTextAtlas(textGlyphs->assetID());
+  if (textAtlas && (textAtlas->textGlyphsID() != textGlyphs->id() ||
+                    fabsf(textAtlas->scaleFactor() - maxScaleFactor) > SCALE_FACTOR_PRECISION)) {
+    removeTextAtlas(textGlyphs->assetID());
+    textAtlas = nullptr;
+  }
+  if (textAtlas) {
+    return textAtlas;
+  }
+  if (maxScaleFactor < SCALE_FACTOR_PRECISION) {
+    return nullptr;
+  }
+  textAtlas = TextAtlas::Make(textGlyphs, this, maxScaleFactor).release();
+  if (textAtlas) {
+    graphicsMemory += textAtlas->memoryUsage();
+    textAtlases[textGlyphs->assetID()] = textAtlas;
+  }
+  return textAtlas;
+}
+
+void RenderCache::removeTextAtlas(ID assetID) {
+  auto textAtlas = textAtlases.find(assetID);
+  if (textAtlas == textAtlases.end()) {
+    return;
+  }
+  graphicsMemory -= textAtlas->second->memoryUsage();
+  delete textAtlas->second;
+  textAtlases.erase(textAtlas);
+}
+
+void RenderCache::clearAllTextAtlas() {
+  for (auto atlas : textAtlases) {
+    graphicsMemory -= atlas.second->memoryUsage();
+    delete atlas.second;
+  }
+  textAtlases.clear();
+}
+
 void RenderCache::clearAllSnapshots() {
   for (auto& item : snapshotCaches) {
     graphicsMemory -= item.second->memoryUsage();
@@ -297,35 +360,42 @@ void RenderCache::clearAllSnapshots() {
 }
 
 void RenderCache::clearExpiredSnapshots() {
-  while (!snapshotLRU.empty()) {
-    auto snapshot = snapshotLRU.back();
+  std::vector<ID> expiredSnapshots;
+  size_t releaseMemory = 0;
+  for (auto snapshotIter = snapshotLRU.rbegin(); snapshotIter != snapshotLRU.rend();
+       snapshotIter++) {
+    auto& snapshot = *snapshotIter;
     // 只有 Snapshot 数量可能会比较多，使用 LRU
     // 来避免遍历完整的列表，遇到第一个用过的就可以取消遍历。
-    if (usedAssets.count((snapshot->assetID) > 0)) {
+    if (usedAssets.count(snapshot->assetID) > 0) {
       break;
     }
     snapshot->idleFrames++;
     if (snapshot->idleFrames < PURGEABLE_EXPIRED_FRAME &&
-        graphicsMemory < PURGEABLE_GRAPHICS_MEMORY) {
+        graphicsMemory + releaseMemory < PURGEABLE_GRAPHICS_MEMORY) {
       // 总显存占用未超过20M且所有缓存均未超过10帧未使用，跳过清理。
-      break;
+      continue;
     }
-    removeSnapshot(snapshot->assetID);
+    releaseMemory += snapshot->memoryUsage();
+    expiredSnapshots.push_back(snapshot->assetID);
+  }
+  for (const auto& snapshot : expiredSnapshots) {
+    removeSnapshot(snapshot);
   }
 }
 
-void RenderCache::prepareImage(ID assetID, std::shared_ptr<Image> image) {
+void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image) {
   usedAssets.insert(assetID);
   if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
     return;
   }
-  auto task = ImageTask::MakeAndRun(std::move(image));
+  auto task = ImageTask::MakeAndRun(std::move(image), stage->getFileFromReferenceMap(assetID));
   if (task) {
     imageTasks[assetID] = task;
   }
 }
 
-std::shared_ptr<TextureBuffer> RenderCache::getImageBuffer(ID assetID) {
+std::shared_ptr<tgfx::TextureBuffer> RenderCache::getImageBuffer(ID assetID) {
   usedAssets.insert(assetID);
   auto result = imageTasks.find(assetID);
   if (result != imageTasks.end()) {
@@ -350,79 +420,56 @@ void RenderCache::clearExpiredBitmaps() {
   }
 }
 
-static std::shared_ptr<SequenceReader> MakeSequenceReader(std::shared_ptr<File> file,
-                                                          Sequence* sequence,
-                                                          DecodingPolicy policy) {
-  std::shared_ptr<SequenceReader> reader = nullptr;
-  if (sequence->composition->type() == CompositionType::Video) {
-    if (sequence->composition->staticContent()) {
-      // 全静态的序列帧强制软件解码。
-      policy = DecodingPolicy::Software;
-    }
-    reader = SequenceReader::Make(std::move(file), static_cast<VideoSequence*>(sequence), policy);
-  } else {
-    reader = std::make_shared<BitmapSequenceReader>(std::move(file),
-                                                    static_cast<BitmapSequence*>(sequence));
+//===================================== sequence caches =====================================
+
+void RenderCache::prepareSequenceReader(const SequenceReaderFactory* factory, Frame targetFrame) {
+  if (factory == nullptr) {
+    return;
+  }
+  if (factory->staticContent() && hasSnapshot(factory->assetID())) {
+    // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
+    return;
+  }
+  auto reader = getSequenceReaderInternal(factory);
+  if (reader) {
+    reader->prepare(targetFrame);
+  }
+}
+
+std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(
+    const SequenceReaderFactory* factory) {
+  if (factory == nullptr) {
+    return nullptr;
+  }
+  auto reader = getSequenceReaderInternal(factory);
+  if (reader && factory->staticContent()) {
+    // There is no need to cache a reader for the static sequence, it has already been cached as
+    // a snapshot. We get here because the reader was created by prepare() methods.
+    sequenceCaches.erase(factory->assetID());
   }
   return reader;
 }
 
-//===================================== sequence caches =====================================
-
-bool RenderCache::prepareSequenceReader(Sequence* sequence, Frame targetFrame,
-                                        DecodingPolicy policy) {
-  auto composition = sequence->composition;
-  if (!_videoEnabled && composition->type() == CompositionType::Video) {
-    return false;
-  }
-  usedAssets.insert(composition->uniqueID);
-  auto staticComposition = composition->staticContent();
-  if (sequenceCaches.count(composition->uniqueID) != 0) {
-#ifdef PAG_BUILD_FOR_WEB
-    sequenceCaches[composition->uniqueID]->prepareAsync(targetFrame);
-#endif
-    return false;
-  }
-  if (staticComposition && hasSnapshot(composition->uniqueID)) {
-    // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
-    return false;
-  }
-  auto file = stage->getSequenceFile(sequence);
-  auto reader = MakeSequenceReader(file, sequence, policy);
-  sequenceCaches[composition->uniqueID] = reader;
-  reader->prepareAsync(targetFrame);
-  return true;
-}
-
-std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(Sequence* sequence) {
-  if (sequence == nullptr) {
+std::shared_ptr<SequenceReader> RenderCache::getSequenceReaderInternal(
+    const SequenceReaderFactory* factory) {
+  if (factory == nullptr) {
     return nullptr;
   }
-  auto composition = sequence->composition;
-  if (!_videoEnabled && composition->type() == CompositionType::Video) {
+  if (!_videoEnabled && factory->isVideo()) {
     return nullptr;
   }
-  auto compositionID = composition->uniqueID;
-  usedAssets.insert(compositionID);
-  auto staticComposition = sequence->composition->staticContent();
+  auto assetID = factory->assetID();
+  usedAssets.insert(assetID);
   std::shared_ptr<SequenceReader> reader = nullptr;
-  auto result = sequenceCaches.find(compositionID);
+  auto result = sequenceCaches.find(assetID);
   if (result != sequenceCaches.end()) {
     reader = result->second;
-    if (reader->getSequence() != sequence) {
-      clearSequenceCache(compositionID);
-      reader = nullptr;
-    } else if (staticComposition) {
-      // 完全静态的序列帧是预测生成的，第一次访问时就可以移除，上层会进行缓存。
-      sequenceCaches.erase(result);
-    }
   }
   if (reader == nullptr) {
-    auto file = stage->getSequenceFile(sequence);
-    reader = MakeSequenceReader(file, sequence, DecodingPolicy::SoftwareToHardware);
-    if (reader && !staticComposition) {
-      // 完全静态的序列帧不用缓存。
-      sequenceCaches[compositionID] = reader;
+    auto file = stage->getFileFromReferenceMap(assetID);
+    reader = factory->makeReader(file);
+    if (reader) {
+      sequenceCaches[assetID] = reader;
     }
   }
   return reader;

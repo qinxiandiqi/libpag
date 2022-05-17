@@ -18,9 +18,10 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLTextureMaskFragmentProcessor : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -32,8 +33,8 @@ class GLTextureMaskFragmentProcessor : public GLFragmentProcessor {
   UniformHandle scaleUniform;
   UniformHandle deviceCoordMatrixUniform;
 
-  int widthPrev = -1;
-  int heightPrev = -1;
-  Matrix deviceCoordMatrixPrev = Matrix::MakeScale(FLT_MAX);
+  std::optional<int> widthPrev;
+  std::optional<int> heightPrev;
+  std::optional<Matrix> deviceCoordMatrixPrev;
 };
-}  // namespace pag
+}  // namespace tgfx

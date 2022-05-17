@@ -18,9 +18,9 @@
 
 #include "GLUniformHandler.h"
 #include "GLProgramBuilder.h"
-#include "GLTexture.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
-namespace pag {
+namespace tgfx {
 UniformHandle GLUniformHandler::internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
                                                    const std::string& name, bool mangleName,
                                                    std::string* outName) {
@@ -45,17 +45,17 @@ UniformHandle GLUniformHandler::internalAddUniform(ShaderFlags visibility, Shade
 SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const std::string& name) {
   auto mangleName = programBuilder->nameVariable('u', name);
 
-  const auto* gl = static_cast<GLProgramBuilder*>(programBuilder)->gl();
-  const auto& swizzle = gl->caps->configTextureSwizzle(sampler->config);
+  auto caps = GLCaps::Get(programBuilder->getContext());
+  const auto& swizzle = caps->getTextureSwizzle(sampler->format);
 
   ShaderVar::Type type;
-  switch (static_cast<const GLTextureSampler*>(sampler)->glInfo.target) {
-    case GL::TEXTURE_EXTERNAL_OES:
+  switch (static_cast<const GLSampler*>(sampler)->target) {
+    case GL_TEXTURE_EXTERNAL_OES:
       programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
                                                           "GL_OES_EGL_image_external");
       type = ShaderVar::Type::TextureExternalSampler;
       break;
-    case GL::TEXTURE_RECTANGLE:
+    case GL_TEXTURE_RECTANGLE:
       type = ShaderVar::Type::Texture2DRectSampler;
       break;
     default:
@@ -90,7 +90,7 @@ std::string GLUniformHandler::getUniformDeclarations(ShaderFlags visibility) con
 }
 
 void GLUniformHandler::resolveUniformLocations(unsigned programID) {
-  const auto* gl = static_cast<GLProgramBuilder*>(programBuilder)->gl();
+  auto gl = GLFunctions::Get(programBuilder->getContext());
   for (auto& uniform : uniforms) {
     uniform.location = gl->getUniformLocation(programID, uniform.variable.name().c_str());
   }
@@ -98,4 +98,4 @@ void GLUniformHandler::resolveUniformLocations(unsigned programID) {
     sampler.location = gl->getUniformLocation(programID, sampler.variable.name().c_str());
   }
 }
-}  // namespace pag
+}  // namespace tgfx

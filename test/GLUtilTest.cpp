@@ -22,6 +22,8 @@
 #include "gpu/opengl/GLUtil.h"
 
 namespace pag {
+using namespace tgfx;
+
 PAG_TEST_SUIT(GLUtilTest)
 
 int i = 0;
@@ -34,9 +36,9 @@ std::vector<std::pair<std::string, GLVendor>> vendors = {
     {"Imagination Technologies", GLVendor::Imagination},
 };
 const unsigned char* glGetStringMock(unsigned name) {
-  if (name == GL::VENDOR) {
+  if (name == GL_VENDOR) {
     return reinterpret_cast<const unsigned char*>(vendors[i].first.c_str());
-  } else if (name == GL::VERSION) {
+  } else if (name == GL_VERSION) {
     if (i != 0) {
       return reinterpret_cast<const unsigned char*>("2.0");
     } else {
@@ -47,20 +49,20 @@ const unsigned char* glGetStringMock(unsigned name) {
 }
 
 void getIntegervMock(unsigned pname, int* params) {
-  if (pname == GL::MAX_TEXTURE_SIZE) {
+  if (pname == GL_MAX_TEXTURE_SIZE) {
     *params = 1024;
   }
 }
 
 void glGetInternalformativMock(unsigned target, unsigned, unsigned pname, int, int* params) {
-  if (target != GL::RENDERBUFFER) {
+  if (target != GL_RENDERBUFFER) {
     return;
   }
-  if (pname == GL::NUM_SAMPLE_COUNTS) {
+  if (pname == GL_NUM_SAMPLE_COUNTS) {
     *params = 2;
     return;
   }
-  if (pname == GL::SAMPLES) {
+  if (pname == GL_SAMPLES) {
     params[0] = 4;
     params[1] = 8;
   }
@@ -117,10 +119,10 @@ PAG_TEST_F(GLUtilTest, Caps_ID82991749) {
     EXPECT_EQ(caps.standard, GLStandard::GL);
     EXPECT_TRUE(caps.textureRedSupport);
     EXPECT_TRUE(caps.multisampleDisableSupport);
-    EXPECT_EQ(caps.getSampleCount(5, PixelConfig::RGBA_8888), 8);
-    EXPECT_EQ(caps.getSampleCount(10, PixelConfig::RGBA_8888), 1);
-    EXPECT_EQ(caps.getSampleCount(0, PixelConfig::RGBA_8888), 1);
-    EXPECT_EQ(caps.getSampleCount(5, PixelConfig::ALPHA_8), 1);
+    EXPECT_EQ(caps.getSampleCount(5, PixelFormat::RGBA_8888), 8);
+    EXPECT_EQ(caps.getSampleCount(10, PixelFormat::RGBA_8888), 1);
+    EXPECT_EQ(caps.getSampleCount(0, PixelFormat::RGBA_8888), 1);
+    EXPECT_EQ(caps.getSampleCount(5, PixelFormat::ALPHA_8), 1);
   }
   {
     ++i;

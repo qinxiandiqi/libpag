@@ -19,15 +19,15 @@
 #pragma once
 
 #include "FrameCache.h"
-#include "core/Path.h"
+#include "tgfx/core/Path.h"
 
 namespace pag {
-class MaskCache : public FrameCache<Path> {
+class MaskCache : public FrameCache<tgfx::Path> {
  public:
   explicit MaskCache(Layer* layer);
 
  protected:
-  Path* createCache(Frame layerFrame) override;
+  tgfx::Path* createCache(Frame layerFrame) override;
 
  private:
   Layer* layer = nullptr;

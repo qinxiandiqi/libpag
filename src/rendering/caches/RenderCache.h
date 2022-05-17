@@ -18,9 +18,11 @@
 
 #pragma once
 
+#include <list>
 #include <memory>
 #include <unordered_set>
-#include "gpu/Device.h"
+#include "TextAtlas.h"
+#include "TextGlyphs.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/Performance.h"
@@ -30,8 +32,8 @@
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
-#include "rendering/readers/BitmapSequenceReader.h"
-#include "video/DecodingPolicy.h"
+#include "rendering/sequences/SequenceReaderFactory.h"
+#include "tgfx/gpu/Device.h"
 
 namespace pag {
 class RenderCache : public Performance {
@@ -44,9 +46,9 @@ class RenderCache : public Performance {
     return _uniqueID;
   }
 
-  void prepareFrame();
+  void beginFrame();
 
-  void attachToContext(Context* current, bool forHitTest = false);
+  void attachToContext(tgfx::Context* current, bool forHitTest = false);
 
   void detachFromContext();
 
@@ -60,7 +62,7 @@ class RenderCache : public Performance {
   /**
    * Returns the GPU context associated with this cache.
    */
-  Context* getContext() const {
+  tgfx::Context* getContext() const {
     return context;
   }
 
@@ -99,16 +101,18 @@ class RenderCache : public Performance {
    */
   void removeSnapshot(ID assetID);
 
+  TextAtlas* getTextAtlas(const TextGlyphs* textGlyphs);
+
   /**
    * Prepares a bitmap task for next getImageBuffer() call.
    */
-  void prepareImage(ID assetID, std::shared_ptr<Image> image);
+  void prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image);
 
   /**
    * Returns a texture buffer cache of specified asset id. Returns null if there is no associated
    * cache available.
    */
-  std::shared_ptr<TextureBuffer> getImageBuffer(ID assetID);
+  std::shared_ptr<tgfx::TextureBuffer> getImageBuffer(ID assetID);
 
   uint32_t getContentVersion() const;
 
@@ -116,9 +120,9 @@ class RenderCache : public Performance {
 
   void setVideoEnabled(bool value);
 
-  bool prepareSequenceReader(Sequence* sequence, Frame targetFrame, DecodingPolicy policy);
+  void prepareSequenceReader(const SequenceReaderFactory* factory, Frame targetFrame);
 
-  std::shared_ptr<SequenceReader> getSequenceReader(Sequence* sequence);
+  std::shared_ptr<SequenceReader> getSequenceReader(const SequenceReaderFactory* factory);
 
   LayerFilter* getFilterCache(LayerStyle* layerStyle);
 
@@ -140,7 +144,7 @@ class RenderCache : public Performance {
   ID _uniqueID = 0;
   PAGStage* stage = nullptr;
   uint32_t deviceID = 0;
-  Context* context = nullptr;
+  tgfx::Context* context = nullptr;
   int64_t lastTimestamp = 0;
   bool hitTestOnly = false;
   size_t graphicsMemory = 0;
@@ -149,6 +153,7 @@ class RenderCache : public Performance {
   std::unordered_set<ID> usedAssets = {};
   std::unordered_map<ID, Snapshot*> snapshotCaches = {};
   std::list<Snapshot*> snapshotLRU = {};
+  std::unordered_map<ID, TextAtlas*> textAtlases = {};
   std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
   std::unordered_map<ID, std::shared_ptr<SequenceReader>> sequenceCaches;
   std::unordered_map<ID, Filter*> filterCaches;
@@ -171,7 +176,16 @@ class RenderCache : public Performance {
   void clearFilterCache(ID uniqueID);
   bool initFilter(Filter* filter);
 
-  void preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy policy);
+  // text atlas caches:
+  void clearAllTextAtlas();
+  void removeTextAtlas(ID assetID);
+  TextAtlas* getTextAtlas(ID assetID) const;
+
+  void prepareLayers();
+  void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
+  std::shared_ptr<SequenceReader> getSequenceReaderInternal(const SequenceReaderFactory* factory);
+
+  friend class PAGPlayer;
 };
 }  // namespace pag

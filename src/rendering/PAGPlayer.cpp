@@ -16,16 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/GetTimer.h"
 #include "base/utils/TimeUtil.h"
 #include "pag/file.h"
-#include "pag/pag.h"
+#include "rendering/Drawable.h"
 #include "rendering/FileReporter.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/utils/ApplyScaleMode.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 PAGPlayer::PAGPlayer() {
@@ -236,6 +236,24 @@ void PAGPlayer::setAutoClear(bool value) {
   stage->notifyModified(true);
 }
 
+void PAGPlayer::prepare() {
+  LockGuard autoLock(rootLocker);
+  prepareInternal();
+}
+
+void PAGPlayer::prepareInternal() {
+  renderCache->prepareLayers();
+  if (contentVersion != stage->getContentVersion()) {
+    contentVersion = stage->getContentVersion();
+    Recorder recorder = {};
+    stage->draw(&recorder);
+    lastGraphic = recorder.makeGraphic();
+  }
+  if (lastGraphic) {
+    lastGraphic->prepare(renderCache);
+  }
+}
+
 bool PAGPlayer::wait(const BackendSemaphore& waitSemaphore) {
   LockGuard autoLock(rootLocker);
   if (pagSurface == nullptr) {
@@ -258,33 +276,22 @@ bool PAGPlayer::flushInternal(BackendSemaphore* signalSemaphore) {
   if (pagSurface == nullptr) {
     return false;
   }
+  renderCache->beginFrame();
   updateStageSize();
-#ifndef PAG_BUILD_FOR_WEB
-  // must be called before content comparing, otherwise decoders can not be prepared.
-  renderCache->prepareFrame();
-#endif
-  auto renderingStart = GetTimer();
-  if (contentVersion != stage->getContentVersion()) {
-    contentVersion = stage->getContentVersion();
-    Recorder recorder = {};
-    stage->draw(&recorder);
-    lastGraphic = recorder.makeGraphic();
-  }
-  auto presentingStart = GetTimer();
-  if (lastGraphic) {
-    lastGraphic->prepare(renderCache);
-  }
+  tgfx::Clock clock = {};
+  prepareInternal();
+  clock.mark("rendering");
   if (!pagSurface->draw(renderCache, lastGraphic, signalSemaphore, _autoClear)) {
     return false;
   }
-  auto finishTime = GetTimer();
-  renderCache->renderingTime = presentingStart - renderingStart;
-  renderCache->presentingTime = finishTime - presentingStart;
-  renderCache->presentingTime -=
-      renderCache->imageDecodingTime + renderCache->textureUploadingTime +
-      renderCache->programCompilingTime + renderCache->hardwareDecodingTime +
-      renderCache->softwareDecodingTime;
-  renderCache->totalTime = finishTime - renderingStart;
+  clock.mark("presenting");
+  renderCache->renderingTime = clock.measure("", "rendering");
+  renderCache->presentingTime = clock.measure("rendering", "presenting");
+  auto knownTime = renderCache->imageDecodingTime + renderCache->textureUploadingTime +
+                   renderCache->programCompilingTime + renderCache->hardwareDecodingTime +
+                   renderCache->softwareDecodingTime;
+  renderCache->presentingTime -= knownTime;
+  renderCache->totalTime = clock.measure("", "presenting");
   //  auto composition = stage->getRootComposition();
   //  if (composition) {
   //    renderCache->printPerformance(composition->currentFrameInternal());
@@ -301,7 +308,7 @@ Rect PAGPlayer::getBounds(std::shared_ptr<PAGLayer> pagLayer) {
   }
   LockGuard autoLock(rootLocker);
   updateStageSize();
-  Rect bounds = {};
+  tgfx::Rect bounds = {};
   pagLayer->measureBounds(&bounds);
   auto layer = pagLayer.get();
   bool contains = false;
@@ -310,14 +317,15 @@ Rect PAGPlayer::getBounds(std::shared_ptr<PAGLayer> pagLayer) {
       contains = true;
       break;
     }
-    layer->getTotalMatrixInternal().mapRect(&bounds);
+    auto layerMatrix = ToTGFX(layer->getTotalMatrixInternal());
+    layerMatrix.mapRect(&bounds);
     if (layer->_parent == nullptr && layer->trackMatteOwner) {
       layer = layer->trackMatteOwner->_parent;
     } else {
       layer = layer->_parent;
     }
   }
-  return contains ? bounds : Rect::MakeEmpty();
+  return contains ? ToPAG(bounds) : Rect::MakeEmpty();
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGPlayer::getLayersUnderPoint(float surfaceX,
@@ -335,7 +343,7 @@ bool PAGPlayer::hitTestPoint(std::shared_ptr<PAGLayer> pagLayer, float surfaceX,
   updateStageSize();
   auto local = pagLayer->globalToLocalPoint(surfaceX, surfaceY);
   if (!pixelHitTest) {
-    Rect bounds = {};
+    tgfx::Rect bounds = {};
     pagLayer->measureBounds(&bounds);
     return bounds.contains(local.x, local.y);
   }

@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "core/TextBlob.h"
+#include "tgfx/core/TextBlob.h"
 
-namespace pag {
+namespace tgfx {
 class WebTextBlob : public TextBlob {
  public:
   const Font& getFont() const {
@@ -31,4 +31,4 @@ class WebTextBlob : public TextBlob {
 
   std::shared_ptr<TextureBuffer> getImage(float resolutionScale, Matrix* matrix) const override;
 };
-}  // namespace pag
+}  // namespace tgfx

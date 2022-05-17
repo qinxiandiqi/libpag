@@ -18,8 +18,6 @@
 
 #include "FilterRenderer.h"
 #include "base/utils/MatrixUtil.h"
-#include "gpu/Surface.h"
-#include "gpu/opengl/GLContext.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/filters/DisplacementMapFilter.h"
@@ -29,6 +27,7 @@
 #include "rendering/filters/utils/FilterBuffer.h"
 #include "rendering/filters/utils/FilterHelper.h"
 #include "rendering/utils/SurfaceUtil.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
 #define FAST_BLUR_MAX_SCALE_FACTOR 0.1f
@@ -87,7 +86,7 @@ std::unique_ptr<FilterList> FilterRenderer::MakeFilterList(const FilterModifier*
   return filterList;
 }
 
-Rect FilterRenderer::GetParentBounds(const FilterList* filterList) {
+tgfx::Rect FilterRenderer::GetParentBounds(const FilterList* filterList) {
   auto layer = filterList->layer;
   float width, height;
   switch (layer->type()) {
@@ -113,12 +112,12 @@ Rect FilterRenderer::GetParentBounds(const FilterList* filterList) {
       width = height = 0;
       break;
   }
-  return Rect::MakeXYWH(0, 0, width, height);
+  return tgfx::Rect::MakeXYWH(0, 0, width, height);
 }
 
-Rect FilterRenderer::GetContentBounds(const FilterList* filterList,
-                                      std::shared_ptr<Graphic> content) {
-  Rect contentBounds = Rect::MakeEmpty();
+tgfx::Rect FilterRenderer::GetContentBounds(const FilterList* filterList,
+                                            std::shared_ptr<Graphic> content) {
+  tgfx::Rect contentBounds = tgfx::Rect::MakeEmpty();
   if (filterList->processVisibleAreaOnly) {
     content->measureBounds(&contentBounds);
     contentBounds.roundOut();
@@ -128,10 +127,11 @@ Rect FilterRenderer::GetContentBounds(const FilterList* filterList,
   return contentBounds;
 }
 
-void TransformFilterBounds(Rect* filterBounds, const FilterList* filterList) {
+void TransformFilterBounds(tgfx::Rect* filterBounds, const FilterList* filterList) {
   // 滤镜应用顺序：Effects->motionBlur->LayerStyles
   for (auto& effect : filterList->effects) {
-    effect->transformBounds(filterBounds, filterList->effectScale, filterList->layerFrame);
+    effect->transformBounds(ToPAG(filterBounds), ToPAG(filterList->effectScale),
+                            filterList->layerFrame);
     filterBounds->roundOut();
   }
 
@@ -145,7 +145,7 @@ void TransformFilterBounds(Rect* filterBounds, const FilterList* filterList) {
   }
 }
 
-void FilterRenderer::MeasureFilterBounds(Rect* bounds, const FilterModifier* modifier) {
+void FilterRenderer::MeasureFilterBounds(tgfx::Rect* bounds, const FilterModifier* modifier) {
   auto filterList = MakeFilterList(modifier);
   if (filterList->processVisibleAreaOnly) {
     bounds->roundOut();
@@ -154,28 +154,28 @@ void FilterRenderer::MeasureFilterBounds(Rect* bounds, const FilterModifier* mod
   }
   TransformFilterBounds(bounds, filterList.get());
   if (filterList->useParentSizeInput) {
-    Matrix inverted = Matrix::I();
+    tgfx::Matrix inverted = tgfx::Matrix::I();
     filterList->layerMatrix.invert(&inverted);
     inverted.mapRect(bounds);
   }
 }
 
-Rect GetClipBounds(Canvas* canvas, const FilterList* filterList) {
+tgfx::Rect GetClipBounds(tgfx::Canvas* canvas, const FilterList* filterList) {
   auto clip = canvas->getTotalClip();
   auto matrix = canvas->getMatrix();
   if (filterList->useParentSizeInput) {
-    Matrix inverted = Matrix::I();
+    tgfx::Matrix inverted = tgfx::Matrix::I();
     filterList->layerMatrix.invert(&inverted);
     matrix.preConcat(inverted);
   }
-  Matrix inverted = Matrix::I();
+  tgfx::Matrix inverted = tgfx::Matrix::I();
   matrix.invert(&inverted);
   clip.transform(inverted);
   return clip.getBounds();
 }
 
 std::shared_ptr<Graphic> GetDisplacementMapGraphic(const FilterList* filterList, Layer* mapLayer,
-                                                   Rect* mapBounds) {
+                                                   tgfx::Rect* mapBounds) {
   // DisplacementMap只支持引用视频序列帧或者位图序列帧图层。
   // TODO(domrjchen): DisplacementMap 支持所有图层
   auto preComposeLayer = static_cast<PreComposeLayer*>(mapLayer);
@@ -188,9 +188,9 @@ std::shared_ptr<Graphic> GetDisplacementMapGraphic(const FilterList* filterList,
   return static_cast<GraphicContent*>(content)->graphic;
 }
 
-static bool MakeLayerStyleNode(std::vector<FilterNode>& filterNodes, Rect& clipBounds,
+static bool MakeLayerStyleNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
                                const FilterList* filterList, RenderCache* renderCache,
-                               Rect& filterBounds) {
+                               tgfx::Rect& filterBounds) {
   if (!filterList->layerStyles.empty()) {
     auto filter = renderCache->getLayerStylesFilter(filterList->layer);
     if (nullptr == filter) {
@@ -209,9 +209,9 @@ static bool MakeLayerStyleNode(std::vector<FilterNode>& filterNodes, Rect& clipB
   return true;
 }
 
-static bool MakeMotionBlurNode(std::vector<FilterNode>& filterNodes, Rect& clipBounds,
+static bool MakeMotionBlurNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
                                const FilterList* filterList, RenderCache* renderCache,
-                               Rect& filterBounds, Point& effectScale) {
+                               tgfx::Rect& filterBounds, tgfx::Point& effectScale) {
   if (filterList->layer->motionBlur) {
     auto filter = renderCache->getMotionBlurFilter();
     if (filter && filter->updateLayer(filterList->layer, filterList->layerFrame)) {
@@ -229,21 +229,22 @@ static bool MakeMotionBlurNode(std::vector<FilterNode>& filterNodes, Rect& clipB
   return true;
 }
 
-bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, Rect& clipBounds,
+bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
                                     const FilterList* filterList, RenderCache* renderCache,
-                                    Rect& filterBounds, Point& effectScale, int clipIndex) {
+                                    tgfx::Rect& filterBounds, tgfx::Point& effectScale,
+                                    int clipIndex) {
   auto effectIndex = 0;
   for (auto& effect : filterList->effects) {
     auto filter = renderCache->getFilterCache(effect);
     if (filter) {
       auto oldBounds = filterBounds;
-      effect->transformBounds(&filterBounds, effectScale, filterList->layerFrame);
+      effect->transformBounds(ToPAG(&filterBounds), ToPAG(effectScale), filterList->layerFrame);
       filterBounds.roundOut();
       filter->update(filterList->layerFrame, oldBounds, filterBounds, effectScale);
       if (effect->type() == EffectType::DisplacementMap) {
         auto mapEffect = static_cast<DisplacementMapEffect*>(effect);
         auto mapFilter = static_cast<DisplacementMapFilter*>(filter);
-        auto mapBounds = Rect::MakeEmpty();
+        auto mapBounds = tgfx::Rect::MakeEmpty();
         auto graphic =
             GetDisplacementMapGraphic(filterList, mapEffect->displacementMapLayer, &mapBounds);
         mapBounds.roundOut();
@@ -261,7 +262,8 @@ bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, Rect& 
 
 std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filterList,
                                                         RenderCache* renderCache,
-                                                        Rect* contentBounds, const Rect& clipRect) {
+                                                        tgfx::Rect* contentBounds,
+                                                        const tgfx::Rect& clipRect) {
   // 滤镜应用顺序：Effects->PAGFilter->motionBlur->LayerStyles
   std::vector<FilterNode> filterNodes = {};
   int clipIndex = -1;
@@ -302,10 +304,9 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
   return filterNodes;
 }
 
-void ApplyFilters(Context* context, std::vector<FilterNode> filterNodes, const Rect& contentBounds,
-                  FilterSource* filterSource, FilterTarget* filterTarget) {
-  GLStateGuard stateGuard(context);
-  auto gl = GLContext::Unwrap(context);
+void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
+                  const tgfx::Rect& contentBounds, FilterSource* filterSource,
+                  FilterTarget* filterTarget) {
   auto scale = filterSource->scale;
   std::shared_ptr<FilterBuffer> freeBuffer = nullptr;
   std::shared_ptr<FilterBuffer> lastBuffer = nullptr;
@@ -332,12 +333,11 @@ void ApplyFilters(Context* context, std::vector<FilterNode> filterNodes, const R
     if (currentBuffer == nullptr) {
       return;
     }
-    currentBuffer->clearColor(gl);
-    auto offsetMatrix = Matrix::MakeTrans((lastBounds.left - node.bounds.left) * scale.x,
-                                          (lastBounds.top - node.bounds.top) * scale.y);
+    currentBuffer->clearColor();
+    auto offsetMatrix = tgfx::Matrix::MakeTrans((lastBounds.left - node.bounds.left) * scale.x,
+                                                (lastBounds.top - node.bounds.top) * scale.y);
     auto currentTarget = currentBuffer->toFilterTarget(offsetMatrix);
     node.filter->draw(context, source, currentTarget.get());
-    currentBuffer->resolve(context);
     lastSource = currentBuffer->toFilterSource(scale);
     freeBuffer = lastBuffer;
     lastBuffer = currentBuffer;
@@ -346,19 +346,19 @@ void ApplyFilters(Context* context, std::vector<FilterNode> filterNodes, const R
   }
 }
 
-static bool HasComplexPaint(Canvas* parentCanvas, const Rect& drawingBounds) {
+static bool HasComplexPaint(tgfx::Canvas* parentCanvas, const tgfx::Rect& drawingBounds) {
   if (parentCanvas->getAlpha() != 1.0f) {
     return true;
   }
-  if (parentCanvas->getBlendMode() != Blend::SrcOver) {
+  if (parentCanvas->getBlendMode() != tgfx::BlendMode::SrcOver) {
     return true;
   }
   auto bounds = drawingBounds;
   auto matrix = parentCanvas->getMatrix();
   matrix.mapRect(&bounds);
   auto surface = parentCanvas->getSurface();
-  auto surfaceBounds =
-      Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height()));
+  auto surfaceBounds = tgfx::Rect::MakeWH(static_cast<float>(surface->width()),
+                                          static_cast<float>(surface->height()));
   bounds.intersect(surfaceBounds);
   auto clip = parentCanvas->getTotalClip();
   if (!clip.contains(bounds)) {
@@ -367,11 +367,11 @@ static bool HasComplexPaint(Canvas* parentCanvas, const Rect& drawingBounds) {
   return false;
 }
 
-std::unique_ptr<FilterTarget> GetDirectFilterTarget(Canvas* parentCanvas,
+std::unique_ptr<FilterTarget> GetDirectFilterTarget(tgfx::Canvas* parentCanvas,
                                                     const FilterList* filterList,
                                                     const std::vector<FilterNode>& filterNodes,
-                                                    const Rect& contentBounds,
-                                                    const Point& sourceScale) {
+                                                    const tgfx::Rect& contentBounds,
+                                                    const tgfx::Point& sourceScale) {
   // 在高分辨率下，模糊滤镜的开销会增大，需要降采样降低开销；当模糊为最后一个滤镜时，需要离屏绘制
   if (!filterList->effects.empty() && filterList->effects.back()->type() == EffectType::FastBlur) {
     return nullptr;
@@ -398,22 +398,23 @@ std::unique_ptr<FilterTarget> GetDirectFilterTarget(Canvas* parentCanvas,
   return ToFilterTarget(surface, totalMatrix);
 }
 
-std::unique_ptr<FilterTarget> GetOffscreenFilterTarget(Surface* surface,
+std::unique_ptr<FilterTarget> GetOffscreenFilterTarget(tgfx::Surface* surface,
                                                        const std::vector<FilterNode>& filterNodes,
-                                                       const Rect& contentBounds,
-                                                       const Point& sourceScale) {
+                                                       const tgfx::Rect& contentBounds,
+                                                       const tgfx::Point& sourceScale) {
   auto finalBounds = filterNodes.back().bounds;
   auto secondToLastBounds =
       filterNodes.size() > 1 ? filterNodes[filterNodes.size() - 2].bounds : contentBounds;
-  auto totalMatrix = Matrix::MakeTrans((secondToLastBounds.left - finalBounds.left) * sourceScale.x,
-                                       (secondToLastBounds.top - finalBounds.top) * sourceScale.y);
+  auto totalMatrix =
+      tgfx::Matrix::MakeTrans((secondToLastBounds.left - finalBounds.left) * sourceScale.x,
+                              (secondToLastBounds.top - finalBounds.top) * sourceScale.y);
   return ToFilterTarget(surface, totalMatrix);
 }
 
-std::unique_ptr<FilterSource> ToFilterSource(Canvas* canvas) {
+std::unique_ptr<FilterSource> ToFilterSource(tgfx::Canvas* canvas) {
   auto surface = canvas->getSurface();
   auto texture = surface->getTexture();
-  Point scale = {};
+  tgfx::Point scale = {};
   scale.x = scale.y = GetMaxScaleFactor(canvas->getMatrix());
   return ToFilterSource(texture.get(), scale);
 }
@@ -434,7 +435,7 @@ void FilterRenderer::ProcessFastBlur(FilterList* filterList) {
   }
 }
 
-void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, RenderCache* cache,
+void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cache,
                                     const FilterModifier* modifier,
                                     std::shared_ptr<Graphic> content) {
   auto filterList = MakeFilterList(modifier);
@@ -447,7 +448,7 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, RenderCache* cache,
     return;
   }
   if (filterList->useParentSizeInput) {
-    Matrix inverted = Matrix::I();
+    tgfx::Matrix inverted = tgfx::Matrix::I();
     filterList->layerMatrix.invert(&inverted);
     parentCanvas->concat(inverted);
   }
@@ -463,7 +464,7 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, RenderCache* cache,
   }
   content->draw(contentCanvas, cache);
   auto filterSource = ToFilterSource(contentCanvas);
-  std::shared_ptr<Surface> targetSurface = nullptr;
+  std::shared_ptr<tgfx::Surface> targetSurface = nullptr;
   std::unique_ptr<FilterTarget> filterTarget = GetDirectFilterTarget(
       parentCanvas, filterList.get(), filterNodes, contentBounds, filterSource->scale);
   if (filterTarget == nullptr) {
@@ -482,9 +483,11 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, RenderCache* cache,
   parentCanvas->flush();
   auto context = parentCanvas->getContext();
   ApplyFilters(context, filterNodes, contentBounds, filterSource.get(), filterTarget.get());
+  // Reset the GL states stored in the context, they may be modified during the filter being applied.
+  context->resetState();
 
   if (targetSurface) {
-    Matrix drawingMatrix = {};
+    tgfx::Matrix drawingMatrix = {};
     auto targetCanvas = targetSurface->getCanvas();
     if (!targetCanvas->getMatrix().invert(&drawingMatrix)) {
       drawingMatrix.setIdentity();

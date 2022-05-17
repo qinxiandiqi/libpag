@@ -16,17 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/qt/QGLWindow.h"
+#include "tgfx/gpu/opengl/qt/QGLWindow.h"
 #include <QApplication>
 #include <QQuickWindow>
 #include <QThread>
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLDefines.h"
-#include "gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLSurface.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
-namespace pag {
+namespace tgfx {
 
 std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem,
                                                QOpenGLContext* sharedContext) {
@@ -57,10 +56,6 @@ void QGLWindow::moveToThread(QThread* targetThread) {
 }
 
 QSGTexture* QGLWindow::getTexture() {
-  if (QThread::currentThread() != QApplication::instance()->thread()) {
-    LOGE("QGLWindow::getTexture() can be called on the main (GUI) thread only.");
-    return nullptr;
-  }
   std::lock_guard<std::mutex> autoLock(locker);
   auto nativeWindow = quickItem->window();
   if (nativeWindow == nullptr) {
@@ -72,7 +67,7 @@ QSGTexture* QGLWindow::getTexture() {
       delete outTexture;
       outTexture = nullptr;
     }
-    auto textureID = frontTexture->getGLInfo().id;
+    auto textureID = frontTexture->glSampler().id;
     auto width = static_cast<int>(ceil(quickItem->width()));
     auto height = static_cast<int>(ceil(quickItem->height()));
     outTexture = nativeWindow->createTextureFromId(textureID, QSize(width, height),
@@ -97,23 +92,24 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  frontTexture = GLTexture::MakeRGBA(context, width, height);
-  backTexture = GLTexture::MakeRGBA(context, width, height);
-  renderTarget = GLRenderTarget::MakeFrom(context, backTexture.get());
-  return GLSurface::MakeFrom(context, renderTarget);
+  frontTexture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
+  backTexture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
+  auto surface = Surface::MakeFrom(backTexture);
+  renderTarget = std::static_pointer_cast<GLRenderTarget>(surface->getRenderTarget());
+  return surface;
 }
 
 void QGLWindow::onPresent(Context* context, int64_t) {
   if (renderTarget == nullptr) {
     return;
   }
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLFunctions::Get(context);
   std::swap(frontTexture, backTexture);
   gl->flush();
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->getGLInfo().id);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
   gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                           backTexture->getGLInfo().id, 0);
+                           backTexture->glSampler().id, 0);
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
   invalidateTexture();
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "platform/Print.h"
+#include "tgfx/platform/Print.h"
 #include <android/log.h>
 
-namespace pag {
+namespace tgfx {
 #define LOG_TAG "Log"
 
 void PrintLog(const char format[], ...) {
@@ -35,4 +35,4 @@ void PrintError(const char format[], ...) {
   __android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, args);
   va_end(args);
 }
-}  // namespace pag
+}  // namespace tgfx

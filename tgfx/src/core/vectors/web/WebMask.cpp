@@ -19,11 +19,12 @@
 #include "WebMask.h"
 #include "WebTextBlob.h"
 #include "WebTypeface.h"
-#include "gpu/opengl/GLTexture.h"
+#include "gpu/opengl/GLContext.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<Mask> Mask::Make(int width, int height) {
   auto webMaskClass = val::module_property("WebMask");
   if (!webMaskClass.as<bool>()) {
@@ -41,8 +42,8 @@ std::shared_ptr<Texture> WebMask::makeTexture(Context* context) const {
   if (texture == nullptr) {
     return nullptr;
   }
-  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->getGLInfo();
-  const auto* gl = GLContext::Unwrap(context);
+  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
+  auto gl = GLFunctions::Get(context);
   gl->bindTexture(glInfo.target, glInfo.id);
   webMask.call<void>("update", val::module_property("GL"));
   return texture;
@@ -82,7 +83,7 @@ void WebMask::fillPath(const Path& path) {
   finalPath.transform(matrix);
   auto path2D = path2DClass.new_();
   finalPath.decompose(Iterator, &path2D);
-  webMask.call<val>("fillPath", path2D, path.getFillType());
+  webMask.call<void>("fillPath", path2D, path.getFillType());
 }
 
 bool WebMask::fillText(const TextBlob* textBlob) {
@@ -102,13 +103,22 @@ bool WebMask::drawText(const TextBlob* textBlob, const Stroke* stroke) {
   const auto* webTextBlob = static_cast<const WebTextBlob*>(textBlob);
   webTextBlob->getTextsAndPositions(&texts, &points);
   const auto& font = webTextBlob->getFont();
+  const auto* typeFace = static_cast<WebTypeface*>(font.getTypeface().get());
+  auto webFont = val::object();
+  webFont.set("name", typeFace->fontFamily());
+  webFont.set("style", typeFace->fontStyle());
+  webFont.set("size", font.getSize());
+  webFont.set("bold", font.isFauxBold());
+  webFont.set("italic", font.isFauxItalic());
   if (stroke) {
-    webMask.call<val>("strokeText", font.getSize(), font.isFauxBold(), font.isFauxItalic(),
-                      font.getTypeface()->fontFamily(), *stroke, texts, points, matrix);
+    webMask.call<void>("strokeText", webFont, *stroke, texts, points, matrix);
   } else {
-    webMask.call<val>("fillText", font.getSize(), font.isFauxBold(), font.isFauxItalic(),
-                      font.getTypeface()->fontFamily(), texts, points, matrix);
+    webMask.call<void>("fillText", webFont, texts, points, matrix);
   }
   return true;
 }
-}  // namespace pag
+
+void WebMask::clear() {
+  webMask.call<void>("clear");
+}
+}  // namespace tgfx

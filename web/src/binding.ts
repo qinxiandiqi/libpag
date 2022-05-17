@@ -11,11 +11,14 @@ import { VideoReader } from './core/video-reader';
 import { ScalerContext } from './core/scaler-context';
 import { WebMask } from './core/web-mask';
 import { NativeImage } from './core/native-image';
+import { PAGTextLayer } from './pag-text-layer';
+import { GlobalCanvas } from './core/global-canvas';
 
 /**
  * Binding pag js module on pag webassembly module.
  */
 export const binding = (module: PAG) => {
+  module.PAG = module;
   module.PAGFile = PAGFile;
   PAGFile.module = module;
   module.PAGPlayer = PAGPlayer;
@@ -32,18 +35,25 @@ export const binding = (module: PAG) => {
   PAGComposition.module = module;
   module.PAGSurface = PAGSurface;
   PAGSurface.module = module;
+  module.PAGTextLayer = PAGTextLayer;
+  PAGTextLayer.module = module;
   module.VideoReader = VideoReader;
   module.NativeImage = NativeImage;
   module.ScalerContext = ScalerContext;
   module.WebMask = WebMask;
   WebMask.module = module;
+  module.GlobalCanvas = GlobalCanvas;
+  GlobalCanvas.module = module;
   module.traceImage = function (info, pixels) {
     const canvas = document.createElement('canvas');
     canvas.width = info.width;
     canvas.height = info.height;
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d') as CanvasRenderingContext2D;
     const imageData = new ImageData(new Uint8ClampedArray(pixels), canvas.width, canvas.height);
     context.putImageData(imageData, 0, 0);
     document.body.appendChild(canvas);
+  };
+  module.registerSoftwareDecoderFactory = function (factory) {
+    module._registerSoftwareDecoderFactory(factory);
   };
 };

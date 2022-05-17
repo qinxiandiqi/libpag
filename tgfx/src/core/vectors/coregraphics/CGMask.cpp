@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGMask.h"
-#include "core/Bitmap.h"
-#include "core/Mask.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Mask.h"
 
-namespace pag {
+namespace tgfx {
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
   auto cgPath = reinterpret_cast<CGMutablePathRef>(info);
   switch (verb) {
@@ -63,10 +63,9 @@ void CGMask::fillPath(const Path& path) {
     return;
   }
   const auto& info = buffer->info();
-  auto pixels = buffer->lockPixels();
-  auto cgContext = CreateBitmapContext(info, pixels);
+  Bitmap bm(buffer);
+  auto cgContext = CreateBitmapContext(info, bm.writablePixels());
   if (cgContext == nullptr) {
-    buffer->unlockPixels();
     return;
   }
 
@@ -104,6 +103,9 @@ void CGMask::fillPath(const Path& path) {
 
   CGContextRelease(cgContext);
   CGPathRelease(cgPath);
-  buffer->unlockPixels();
 }
-}  // namespace pag
+
+void CGMask::clear() {
+  Bitmap(buffer).eraseAll();
+}
+}  // namespace tgfx

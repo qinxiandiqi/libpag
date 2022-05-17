@@ -18,9 +18,10 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLXferProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLPorterDuffXferProcessor : public GLXferProcessor {
  public:
   void emitCode(const EmitArgs&) override;
@@ -32,8 +33,8 @@ class GLPorterDuffXferProcessor : public GLXferProcessor {
   UniformHandle dstTopLeftUniform;
   UniformHandle dstScaleUniform;
 
-  Point dstTopLeftPrev = Point::Make(-1, -1);
-  int widthPrev = -1;
-  int heightPrev = -1;
+  std::optional<Point> dstTopLeftPrev;
+  std::optional<int> widthPrev;
+  std::optional<int> heightPrev;
 };
-}  // namespace pag
+}  // namespace tgfx

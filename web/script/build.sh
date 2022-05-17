@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 SOURCE_DIR=../..
 BUILD_DIR=../../build
@@ -28,8 +28,7 @@ emcc $RELEASE_CONF -std=c++17 \
   -I$SOURCE_DIR/tgfx/include/ \
   -I$SOURCE_DIR/tgfx/src/ \
   -DPAG_BUILD_FOR_WEB \
-  ../src/pag_wasm_bindings.cpp \
-  $BUILD_DIR/libpag.a \
+  -Wl,--whole-archive $BUILD_DIR/libpag.a \
   --no-entry \
   --bind \
   -s WASM=1 \
@@ -46,11 +45,23 @@ emcc $RELEASE_CONF -std=c++17 \
   -s USE_ES6_IMPORT_META=0 \
   -o ../src/wasm/libpag.js
 
+if test $? -eq 0
+then
+echo "~~~~~~~~~~~~~~~~~~~wasm build success~~~~~~~~~~~~~~~~~~"
+else
+echo "~~~~~~~~~~~~~~~~~~~wasm build failed~~~~~~~~~~~~~~~~~~~"
+exit 1
+fi
+
 if [ ! -d "../lib" ]; then
   mkdir ../lib
 fi
 
 cp -f ../src/wasm/libpag.wasm ../lib
+
+if [ ! -d "../node_modules" ]; then
+  npm install
+fi
 
 $BUILD_TS
 
